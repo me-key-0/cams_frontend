@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BookOpenIcon,
   UserGroupIcon,
@@ -66,12 +67,17 @@ const mockCourses: Course[] = [
 export default function Courses() {
   const [selectedSemester, setSelectedSemester] = useState("Spring 2024");
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
   const filteredCourses = mockCourses.filter(
     (course) =>
       course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/student/courses/${courseId}/resources`);
+  };
 
   return (
     <div className="space-y-6">
@@ -108,7 +114,8 @@ export default function Courses() {
         {filteredCourses.map((course) => (
           <div
             key={course.id}
-            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
+            onClick={() => handleCourseClick(course.id)}
+            className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer"
           >
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-between">

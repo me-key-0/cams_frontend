@@ -17,6 +17,16 @@ import StudentGPACalculator from "./pages/student/GPACalculator";
 import StudentSchedules from "./pages/student/Schedules";
 import StudentCourses from "./pages/student/Courses";
 import StudentContactAdmin from "./pages/student/ContactAdmin";
+import CourseDetails from "./pages/student/courses/CourseDetails";
+import CourseResources from "./pages/student/courses/CourseResources";
+import CourseNotifications from "./pages/student/courses/CourseNotifications";
+import CourseGrades from "./pages/student/courses/CourseGrades";
+import CourseAssessments from "./pages/student/courses/CourseAssessments";
+import CourseChat from "./pages/student/courses/CourseChat";
+// import CourseNotifications from "./pages/student/courses/CourseNotifications";
+// import CourseGrades from "./pages/student/courses/CourseGrades";
+// import CourseAssessments from "./pages/student/courses/CourseAssessments";
+// import CourseChat from "./pages/student/courses/CourseChat";
 
 function App() {
   return (
@@ -47,6 +57,18 @@ function App() {
               path="/student/contact-admin"
               element={<StudentContactAdmin />}
             />
+
+            {/* Course Routes */}
+            <Route
+              path="/student/courses/:courseId"
+              element={<CourseDetails />}
+            >
+              <Route path="resources" element={<CourseResources />} />
+              <Route path="notifications" element={<CourseNotifications />} />
+              <Route path="grades" element={<CourseGrades />} />
+              <Route path="assessments" element={<CourseAssessments />} />
+              <Route path="chat" element={<CourseChat />} />
+            </Route>
           </Route>
         </Route>
 
