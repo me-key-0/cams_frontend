@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import Unauthorized from "./pages/Unauthorized";
 import StudentDashboard from "./pages/student/Dashboard";
 import StudentAnnouncements from "./pages/student/Announcements";
 import StudentGrades from "./pages/student/Grades";
@@ -23,10 +24,15 @@ import CourseNotifications from "./pages/student/courses/CourseNotifications";
 import CourseGrades from "./pages/student/courses/CourseGrades";
 import CourseAssessments from "./pages/student/courses/CourseAssessments";
 import CourseChat from "./pages/student/courses/CourseChat";
-// import CourseNotifications from "./pages/student/courses/CourseNotifications";
-// import CourseGrades from "./pages/student/courses/CourseGrades";
-// import CourseAssessments from "./pages/student/courses/CourseAssessments";
-// import CourseChat from "./pages/student/courses/CourseChat";
+
+// Lecturer imports
+import LecturerDashboard from "./pages/lecturer/Dashboard";
+import LecturerAnnouncements from "./pages/lecturer/Announcements";
+import LecturerResources from "./pages/lecturer/Resources";
+import LecturerGrades from "./pages/lecturer/Grades";
+import LecturerAssessments from "./pages/lecturer/Assessments";
+import LecturerChat from "./pages/lecturer/Chat";
+import LecturerContactAdmin from "./pages/lecturer/ContactAdmin";
 
 function App() {
   return (
@@ -37,6 +43,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
 
         {/* Protected Student Routes */}
         <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
@@ -69,6 +76,28 @@ function App() {
               <Route path="assessments" element={<CourseAssessments />} />
               <Route path="chat" element={<CourseChat />} />
             </Route>
+          </Route>
+        </Route>
+
+        {/* Protected Lecturer Routes */}
+        <Route element={<ProtectedRoute allowedRoles={["lecturer"]} />}>
+          <Route element={<Layout />}>
+            <Route path="/lecturer" element={<LecturerDashboard />} />
+            <Route
+              path="/lecturer/announcements"
+              element={<LecturerAnnouncements />}
+            />
+            <Route path="/lecturer/resources" element={<LecturerResources />} />
+            <Route path="/lecturer/grades" element={<LecturerGrades />} />
+            <Route
+              path="/lecturer/assessments"
+              element={<LecturerAssessments />}
+            />
+            <Route path="/lecturer/chat" element={<LecturerChat />} />
+            <Route
+              path="/lecturer/contact-admin"
+              element={<LecturerContactAdmin />}
+            />
           </Route>
         </Route>
 

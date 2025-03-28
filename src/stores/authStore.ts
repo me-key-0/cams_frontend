@@ -26,7 +26,10 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       login: (user, token) =>
         set({
-          user,
+          user: {
+            ...user,
+            role: user.role as "student" | "lecturer" | "admin" | "super_admin",
+          },
           token,
           isAuthenticated: true,
         }),

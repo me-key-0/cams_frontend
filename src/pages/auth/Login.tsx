@@ -19,18 +19,19 @@ export default function Login() {
     try {
       setIsLoading(true);
       // Mock successful login with user data and token
+      const isLecturer = data.email === "lecturer@example.com";
       login(
         {
-          id: "1",
+          id: isLecturer ? "2" : "1",
           email: data.email,
-          firstName: "John",
-          lastName: "Doe",
-          role: "student",
+          firstName: isLecturer ? "Sarah" : "John",
+          lastName: isLecturer ? "Wilson" : "Doe",
+          role: isLecturer ? "lecturer" : "student",
         },
         "mock-token"
       );
       toast.success("Login successful!");
-      navigate("/student");
+      navigate(isLecturer ? "/lecturer" : "/student");
     } catch (error) {
       toast.error("Login failed. Please check your credentials.");
     } finally {

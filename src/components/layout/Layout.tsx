@@ -10,10 +10,12 @@ import {
   ChatBubbleLeftRightIcon,
   Bars3Icon,
   XMarkIcon,
+  FolderIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../stores/authStore";
 
-const navigation = [
+const studentNavigation = [
   { name: "Dashboard", href: "/student", icon: HomeIcon },
   {
     name: "Announcements",
@@ -35,10 +37,35 @@ const navigation = [
   },
 ];
 
+const lecturerNavigation = [
+  { name: "Dashboard", href: "/lecturer", icon: HomeIcon },
+  {
+    name: "Announcements",
+    href: "/lecturer/announcements",
+    icon: MegaphoneIcon,
+  },
+  { name: "Resources", href: "/lecturer/resources", icon: FolderIcon },
+  { name: "Grades", href: "/lecturer/grades", icon: AcademicCapIcon },
+  {
+    name: "Assessments",
+    href: "/lecturer/assessments",
+    icon: ClipboardDocumentListIcon,
+  },
+  { name: "Chat", href: "/lecturer/chat", icon: ChatBubbleLeftRightIcon },
+  {
+    name: "Contact Admin",
+    href: "/lecturer/contact-admin",
+    icon: ChatBubbleLeftRightIcon,
+  },
+];
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuthStore();
+
+  const navigation =
+    user?.role === "lecturer" ? lecturerNavigation : studentNavigation;
 
   return (
     <div className="min-h-screen bg-gray-50">
