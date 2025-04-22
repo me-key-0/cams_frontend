@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   PlusIcon,
   TrashIcon,
-  PencilIcon,
   DocumentIcon,
   ClockIcon,
   BellIcon,
