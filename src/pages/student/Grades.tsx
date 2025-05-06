@@ -8,10 +8,10 @@ interface Course {
   credits: number;
   grade: string;
   gradePoint: number;
+  yearLevel: string;
   semester: string;
 }
 
-// Mock data - replace with actual API calls
 const mockCourses: Course[] = [
   {
     id: "1",
@@ -20,7 +20,8 @@ const mockCourses: Course[] = [
     credits: 3,
     grade: "A",
     gradePoint: 4.0,
-    semester: "Fall 2023",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "2",
@@ -29,7 +30,8 @@ const mockCourses: Course[] = [
     credits: 4,
     grade: "B+",
     gradePoint: 3.3,
-    semester: "Fall 2023",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "3",
@@ -38,17 +40,43 @@ const mockCourses: Course[] = [
     credits: 4,
     grade: "A-",
     gradePoint: 3.7,
-    semester: "Spring 2024",
+    yearLevel: "1st Year",
+    semester: "2nd Semester",
+  },
+  {
+    id: "4",
+    code: "CS301",
+    name: "Algorithms",
+    credits: 3,
+    grade: "B",
+    gradePoint: 3.0,
+    yearLevel: "3rd Year",
+    semester: "1st Semester",
   },
 ];
 
-const semesters = ["Fall 2023", "Spring 2024"];
+const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+const semesters = ["1st Semester", "2nd Semester"];
+
+const yearOrder = {
+  "1st Year": 1,
+  "2nd Year": 2,
+  "3rd Year": 3,
+  "4th Year": 4,
+};
+
+const semesterOrder = {
+  "1st Semester": 1,
+  "2nd Semester": 2,
+};
 
 export default function Grades() {
+  const [selectedYear, setSelectedYear] = useState(yearLevels[0]);
   const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
 
   const filteredCourses = mockCourses.filter(
-    (course) => course.semester === selectedSemester
+    (course) =>
+      course.yearLevel === selectedYear && course.semester === selectedSemester
   );
 
   const calculateGPA = () => {
@@ -63,17 +91,60 @@ export default function Grades() {
     return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : "0.00";
   };
 
+  const calculateCGPA = () => {
+    const currentYearOrder = yearOrder[selectedYear as keyof typeof yearOrder];
+    const currentSemesterOrder =
+      semesterOrder[selectedSemester as keyof typeof semesterOrder];
+
+    const eligibleCourses = mockCourses.filter((course) => {
+      const courseYearOrder =
+        yearOrder[course.yearLevel as keyof typeof yearOrder];
+      const courseSemesterOrder =
+        semesterOrder[course.semester as keyof typeof semesterOrder];
+
+      return (
+        courseYearOrder < currentYearOrder ||
+        (courseYearOrder === currentYearOrder &&
+          courseSemesterOrder <= currentSemesterOrder)
+      );
+    });
+
+    const totalPoints = eligibleCourses.reduce(
+      (sum, course) => sum + course.gradePoint * course.credits,
+      0
+    );
+    const totalCredits = eligibleCourses.reduce(
+      (sum, course) => sum + course.credits,
+      0
+    );
+    return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : "0.00";
+  };
+
   return (
     <div className="space-y-6">
-      {/* Semester Selection and GPA */}
+      {/* Year and Semester Selection */}
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center space-x-4">
+              {/* Year dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="min-w-[130px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              >
+                {yearLevels.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+
+              {/* Semester dropdown */}
               <select
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                className="min-w-[150px] ml-2 pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               >
                 {semesters.map((semester) => (
                   <option key={semester} value={semester}>
@@ -81,10 +152,20 @@ export default function Grades() {
                   </option>
                 ))}
               </select>
-              <div className="flex items-center">
-                <AcademicCapIcon className="h-5 w-5 text-primary-500 mr-2" />
-                <span className="text-lg font-semibold text-gray-900">
-                  GPA: {calculateGPA()}
+            </div>
+
+            {/* GPA & CGPA Display */}
+            <div className="flex items-center space-x-6 mt-2 sm:mt-0">
+              <div className="flex items-center space-x-2">
+                <AcademicCapIcon className="h-5 w-5 text-primary-500" />
+                <span className="text-sm font-semibold text-gray-700">
+                  GPA: <span className="text-gray-900">{calculateGPA()}</span>
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <AcademicCapIcon className="h-5 w-5 text-green-500" />
+                <span className="text-sm font-semibold text-gray-700">
+                  CGPA: <span className="text-gray-900">{calculateCGPA()}</span>
                 </span>
               </div>
             </div>
@@ -97,35 +178,20 @@ export default function Grades() {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Course Code
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Course Name
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Credits
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                Grade
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Grade Point
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Grade
               </th>
             </tr>
           </thead>
@@ -142,10 +208,10 @@ export default function Grades() {
                   {course.credits}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.grade}
+                  {course.gradePoint}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.gradePoint}
+                  {course.grade}
                 </td>
               </tr>
             ))}
