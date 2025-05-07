@@ -41,22 +41,16 @@ const quickStats = [
     name: "Current GPA",
     value: "3.8",
     icon: AcademicCapIcon,
-    change: "+0.2",
-    changeType: "positive",
   },
   {
     name: "Courses This Semester",
     value: "5",
     icon: BookOpenIcon,
-    change: "0",
-    changeType: "neutral",
   },
   {
     name: "Upcoming Exams",
     value: "2",
     icon: CalendarIcon,
-    change: "-1",
-    changeType: "negative",
   },
 ];
 
@@ -83,23 +77,6 @@ export default function Dashboard() {
             <dd className="ml-16 flex items-baseline pb-6 sm:pb-7">
               <p className="text-2xl font-semibold text-gray-900">
                 {stat.value}
-              </p>
-              <p
-                className={`ml-2 flex items-baseline text-sm font-semibold ${
-                  stat.changeType === "positive"
-                    ? "text-green-600"
-                    : stat.changeType === "negative"
-                    ? "text-red-600"
-                    : "text-gray-500"
-                }`}
-              >
-                {stat.change !== "0" && (
-                  <span className="sr-only">
-                    {stat.changeType === "positive" ? "Increased" : "Decreased"}{" "}
-                    by
-                  </span>
-                )}
-                {stat.change}
               </p>
             </dd>
           </div>
