@@ -12,7 +12,7 @@ interface Announcement {
   date: string;
   author: string;
   type: "info" | "warning" | "success";
-  category: "academic" | "administrative" | "event";
+  category: "academic" | "administrative";
 }
 
 // Mock data - replace with actual API calls
@@ -45,7 +45,7 @@ const mockAnnouncements: Announcement[] = [
     date: "2024-03-22",
     author: "Career Services",
     type: "info",
-    category: "event",
+    category: "administrative",
   },
 ];
 
@@ -53,7 +53,6 @@ const categories = [
   { id: "all", name: "All Categories" },
   { id: "academic", name: "Academic" },
   { id: "administrative", name: "Administrative" },
-  { id: "event", name: "Events" },
 ];
 
 export default function Announcements() {
