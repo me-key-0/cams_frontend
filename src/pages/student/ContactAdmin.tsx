@@ -65,9 +65,9 @@ export default function ContactAdmin() {
               >
                 Subject
               </label>
-              <input
-                type="text"
+              <textarea
                 id="subject"
+                rows={4}
                 value={formData.subject}
                 onChange={(e) =>
                   setFormData({ ...formData, subject: e.target.value })
