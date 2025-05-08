@@ -29,10 +29,16 @@ import CourseChat from "./pages/student/courses/CourseChat";
 import LecturerDashboard from "./pages/lecturer/Dashboard";
 import LecturerAnnouncements from "./pages/lecturer/Announcements";
 import LecturerResources from "./pages/lecturer/Resources";
-import LecturerGrades from "./pages/lecturer/Grades";
-import LecturerAssessments from "./pages/lecturer/Assessments";
+import LecturerAssessments from "./pages/lecturer/classes/ClassesAssessments";
 import LecturerChat from "./pages/lecturer/Chat";
 import LecturerContactAdmin from "./pages/lecturer/ContactAdmin";
+import Classes from "./pages/lecturer/Classes";
+import ClassDetails from "./pages/lecturer/classes/ClassDetails";
+import Grades from "./pages/student/Grades";
+import ClassesResources from "./pages/lecturer/classes/ClassesResources";
+import ClassesGrades from "./pages/lecturer/classes/ClassesGrades";
+import ClassesAssessments from "./pages/lecturer/classes/ClassesAssessments";
+import ClassesChat from "./pages/lecturer/classes/ClassesChat";
 
 function App() {
   return (
@@ -87,8 +93,15 @@ function App() {
               path="/lecturer/announcements"
               element={<LecturerAnnouncements />}
             />
+            <Route path="/lecturer/classes" element={<Classes />} />
+            <Route path="/lecturer/classes/:classId" element={<ClassDetails />}>
+              <Route path="resources" element={<ClassesResources />} />
+              <Route path="grades" element={<ClassesGrades />} />
+              <Route path="assessments" element={<ClassesAssessments />} />
+              <Route path="chat" element={<ClassesChat />} />
+            </Route>
             <Route path="/lecturer/resources" element={<LecturerResources />} />
-            <Route path="/lecturer/grades" element={<LecturerGrades />} />
+            <Route path="/lecturer/grades" element={<Grades />} />
             <Route
               path="/lecturer/assessments"
               element={<LecturerAssessments />}

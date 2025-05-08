@@ -44,14 +44,7 @@ const lecturerNavigation = [
     href: "/lecturer/announcements",
     icon: MegaphoneIcon,
   },
-  { name: "Resources", href: "/lecturer/resources", icon: FolderIcon },
-  { name: "Grades", href: "/lecturer/grades", icon: AcademicCapIcon },
-  {
-    name: "Assessments",
-    href: "/lecturer/assessments",
-    icon: ClipboardDocumentListIcon,
-  },
-  { name: "Chat", href: "/lecturer/chat", icon: ChatBubbleLeftRightIcon },
+  { name: "Classes", href: "/lecturer/classes", icon: BookOpenIcon },
   {
     name: "Contact Admin",
     href: "/lecturer/contact-admin",
