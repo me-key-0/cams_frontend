@@ -6,6 +6,7 @@ import {
   TrashIcon,
   PencilIcon,
   ArrowUpTrayIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 interface Resource {
@@ -24,7 +25,6 @@ interface Resource {
   }[];
 }
 
-// Mock data - replace with actual API calls
 const mockResources: Resource[] = [
   {
     id: "1",
@@ -81,13 +81,15 @@ export default function LecturerResources() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [newResource, setNewResource] = useState({
+  const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [resourceForm, setResourceForm] = useState({
+    id: "",
     title: "",
     description: "",
     type: "document" as "document" | "video" | "link" | "folder",
     category: "",
+    attachments: [] as File[],
   });
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const filteredResources = resources.filter((resource) => {
     const matchesCategory =
@@ -100,259 +102,150 @@ export default function LecturerResources() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
+      setResourceForm({ ...resourceForm, attachments: Array.from(e.target.files) });
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle resource creation with file upload
-    setIsCreating(false);
-    setNewResource({
-      title: "",
-      description: "",
-      type: "document",
-      category: "",
+    const newResource: Resource = {
+      id: isEditing || Date.now().toString(),
+      title: resourceForm.title,
+      description: resourceForm.description,
+      type: resourceForm.type,
+      category: resourceForm.category,
+      uploadDate: new Date().toISOString(),
+      attachments: resourceForm.attachments.map((file) => ({
+        name: file.name,
+        url: URL.createObjectURL(file),
+        type: file.type,
+      })),
+    };
+    
+    setResources((prev) => {
+      if (isEditing) {
+        return prev.map((r) => (r.id === isEditing ? newResource : r));
+      } else {
+        return [...prev, newResource];
+      }
     });
-    setSelectedFiles([]);
+
+    setIsCreating(false);
+    setIsEditing(null);
+    setResourceForm({ id: "", title: "", description: "", type: "document", category: "", attachments: [] });
   };
 
   const handleDelete = (id: string) => {
     setResources(resources.filter((r) => r.id !== id));
   };
 
+  const handleEdit = (resource: Resource) => {
+    setIsCreating(true);
+    setIsEditing(resource.id);
+    setResourceForm({
+      id: resource.id,
+      title: resource.title,
+      description: resource.description,
+      type: resource.type,
+      category: resource.category,
+      attachments: [],
+    });
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">Course Resources</h2>
         <button
-          onClick={() => setIsCreating(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          onClick={() => {
+            setIsCreating(true);
+            setIsEditing(null);
+            setResourceForm({ id: "", title: "", description: "", type: "document", category: "", attachments: [] });
+          }}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Add Resource
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <input
-            type="text"
-            placeholder="Search resources..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="Search resources..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+        />
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
           className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
         >
           <option value="all">All Categories</option>
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
       </div>
 
-      {/* Create Resource Form */}
       {isCreating && (
         <div className="bg-white shadow rounded-lg p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Add New Resource
+            {isEditing ? "Edit Resource" : "Add New Resource"}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label
-                htmlFor="title"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Title
-              </label>
-              <input
-                type="text"
-                id="title"
-                value={newResource.title}
-                onChange={(e) =>
-                  setNewResource({ ...newResource, title: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Description
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                value={newResource.description}
-                onChange={(e) =>
-                  setNewResource({
-                    ...newResource,
-                    description: e.target.value,
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="type"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Type
-              </label>
-              <select
-                id="type"
-                value={newResource.type}
-                onChange={(e) =>
-                  setNewResource({
-                    ...newResource,
-                    type: e.target.value as
-                      | "document"
-                      | "video"
-                      | "link"
-                      | "folder",
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              >
-                <option value="document">Document</option>
-                <option value="video">Video</option>
-                <option value="link">Link</option>
-                <option value="folder">Folder</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="category"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Category
-              </label>
-              <select
-                id="category"
-                value={newResource.category}
-                onChange={(e) =>
-                  setNewResource({ ...newResource, category: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                required
-              >
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Attachments
-              </label>
-              <div className="mt-1 flex items-center">
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
-                  Upload Files
-                </label>
-                {selectedFiles.length > 0 && (
-                  <span className="ml-2 text-sm text-gray-500">
-                    {selectedFiles.length} file(s) selected
-                  </span>
-                )}
-              </div>
-            </div>
-
+            <input type="text" placeholder="Title" value={resourceForm.title} onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })} className="w-full rounded-md border-gray-300" required />
+            <textarea placeholder="Description" value={resourceForm.description} onChange={(e) => setResourceForm({ ...resourceForm, description: e.target.value })} className="w-full rounded-md border-gray-300" required />
+            <select value={resourceForm.type} onChange={(e) => setResourceForm({ ...resourceForm, type: e.target.value as Resource["type"] })} className="w-full rounded-md border-gray-300">
+              <option value="document">Document</option>
+              <option value="video">Video</option>
+              <option value="link">Link</option>
+              <option value="folder">Folder</option>
+            </select>
+            <select value={resourceForm.category} onChange={(e) => setResourceForm({ ...resourceForm, category: e.target.value })} className="w-full rounded-md border-gray-300" required>
+              <option value="">Select category</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <input type="file" multiple onChange={handleFileChange} />
             <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setIsCreating(false)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
+              <button type="button" onClick={() => { setIsCreating(false); setIsEditing(null); }} className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                Create Resource
+              <button type="submit" className="px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700">
+                {isEditing ? "Update Resource" : "Create Resource"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Resources List */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
           {filteredResources.map((resource) => (
-            <li key={resource.id}>
-              <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    {resource.type === "folder" ? (
-                      <FolderIcon className="h-8 w-8 text-yellow-500" />
-                    ) : (
-                      <DocumentIcon className="h-8 w-8 text-blue-500" />
-                    )}
-                    <div className="ml-4">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {resource.title}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {resource.description}
-                      </p>
-                      <div className="mt-1 flex items-center text-xs text-gray-500">
-                        <span className="mr-4">{resource.category}</span>
-                        {resource.size && <span>{resource.size}</span>}
-                        <span className="mx-4">
-                          {new Date(resource.uploadDate).toLocaleDateString()}
-                        </span>
-                      </div>
+            <li key={resource.id} className="px-4 py-4 hover:bg-gray-50">
+              <div className="flex justify-between">
+                <div className="flex items-center">
+                  {resource.type === "folder" ? <FolderIcon className="h-8 w-8 text-yellow-500" /> : <DocumentIcon className="h-8 w-8 text-blue-500" />}
+                  <div className="ml-4">
+                    <h3 className="text-sm font-medium text-gray-900">{resource.title}</h3>
+                    <p className="text-sm text-gray-500">{resource.description}</p>
+                    <div className="mt-1 flex items-center text-xs text-gray-500">
+                      <span className="mr-4">{resource.category}</span>
+                      {resource.size && <span>{resource.size}</span>}
+                      <span className="mx-4">{new Date(resource.uploadDate).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => {
-                        // Handle edit
-                      }}
-                      className="text-gray-400 hover:text-gray-500"
-                    >
-                      <PencilIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(resource.id)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button onClick={() => handleEdit(resource)} className="text-gray-400 hover:text-gray-600">
+                    <PencilIcon className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => handleDelete(resource.id)} className="text-gray-400 hover:text-red-500">
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
             </li>
