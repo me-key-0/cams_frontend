@@ -30,9 +30,9 @@ const mockAnnouncements: Announcement[] = [
   },
   {
     id: "2",
-    title: "Course Registration Deadline",
+    title: "Class Registration Deadline",
     content:
-      "Please note that the course registration deadline is approaching. Make sure to complete your registration by the end of this week.",
+      "Please note that the Class registration deadline is approaching. Make sure to complete your registration by the end of this week.",
     date: "2024-03-14",
     author: "Dr. Sarah Wilson",
     type: "warning",

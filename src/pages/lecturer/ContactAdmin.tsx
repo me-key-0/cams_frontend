@@ -21,9 +21,9 @@ interface Ticket {
 const mockTickets: Ticket[] = [
   {
     id: "1",
-    subject: "Request for Additional Course Materials",
+    subject: "Request for Additional Class Materials",
     message:
-      "I need access to additional course materials for my advanced programming class. The current materials are not sufficient for the curriculum.",
+      "I need access to additional Class materials for my advanced programming class. The current materials are not sufficient for the curriculum.",
     status: "open",
     priority: "medium",
     createdAt: "2024-03-15T10:30:00",

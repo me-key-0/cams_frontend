@@ -41,7 +41,7 @@ interface ChatUser {
 }
 
 // Mock data - replace with actual API calls
-const mockCourses: { [key: string]: { name: string; lecturers: ChatUser[] } } =
+const mockClass: { [key: string]: { name: string; lecturers: ChatUser[] } } =
   {
     "1": {
       name: "Introduction to Programming",
@@ -163,8 +163,8 @@ const mockMessages: { [key: string]: { [key: string]: Message[] } } = {
   },
 };
 
-export default function CourseChat() {
-  const { courseId } = useParams();
+export default function ClassChat() {
+  const { ClassId } = useParams();
   const [selectedLecturer, setSelectedLecturer] = useState<ChatUser | null>(
     null
   );
@@ -173,14 +173,14 @@ export default function CourseChat() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Update messages when courseId or selectedLecturer changes
+  // Update messages when ClassId or selectedLecturer changes
   useEffect(() => {
-    if (courseId && selectedLecturer) {
-      setMessages(mockMessages[courseId]?.[selectedLecturer.id] || []);
+    if (ClassId && selectedLecturer) {
+      setMessages(mockMessages[ClassId]?.[selectedLecturer.id] || []);
     } else {
       setMessages([]);
     }
-  }, [courseId, selectedLecturer]);
+  }, [ClassId, selectedLecturer]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -270,11 +270,11 @@ export default function CourseChat() {
       <div className="w-64 border-r border-gray-200 bg-white">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
-            {mockCourses[courseId || "1"]?.name || "Course Chat"}
+            {mockClass[ClassId || "1"]?.name || "Class Chat"}
           </h2>
         </div>
         <div className="overflow-y-auto h-full">
-          {mockCourses[courseId || "1"]?.lecturers.map((lecturer) => (
+          {mockClass[ClassId || "1"]?.lecturers.map((lecturer) => (
             <div
               key={lecturer.id}
               onClick={() => setSelectedLecturer(lecturer)}
@@ -296,7 +296,7 @@ export default function CourseChat() {
                 <p className="text-sm font-medium text-gray-900">
                   {lecturer.name}
                 </p>
-                <p className="text-xs text-gray-500">Course Lecturer</p>
+                <p className="text-xs text-gray-500">Class Lecturer</p>
                 {!lecturer.isOnline && lecturer.lastSeen && (
                   <p className="text-xs text-gray-500">{lecturer.lastSeen}</p>
                 )}
@@ -322,7 +322,7 @@ export default function CourseChat() {
                   <h3 className="text-lg font-medium text-gray-900">
                     {selectedLecturer.name}
                   </h3>
-                  <p className="text-sm text-gray-500">Course Lecturer</p>
+                  <p className="text-sm text-gray-500">Class Lecturer</p>
                 </div>
               </div>
             </div>

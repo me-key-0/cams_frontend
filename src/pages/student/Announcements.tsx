@@ -21,7 +21,7 @@ const mockAnnouncements: Announcement[] = [
     id: "1",
     title: "Welcome to the New Academic Year",
     content:
-      "We are excited to welcome you to the new academic year. Please make sure to check your schedules and course materials.",
+      "We are excited to welcome you to the new academic year. Please make sure to check your schedules and Class materials.",
     date: "2024-03-24",
     author: "Department Head",
     type: "info",
@@ -29,9 +29,9 @@ const mockAnnouncements: Announcement[] = [
   },
   {
     id: "2",
-    title: "Important: Course Registration Deadline",
+    title: "Important: Class Registration Deadline",
     content:
-      "The deadline for course registration is approaching. Please complete your registration by the end of this week.",
+      "The deadline for Class registration is approaching. Please complete your registration by the end of this week.",
     date: "2024-03-23",
     author: "Academic Office",
     type: "warning",

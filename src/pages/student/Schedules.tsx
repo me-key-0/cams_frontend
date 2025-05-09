@@ -2,8 +2,8 @@ import { useState } from "react";
 
 interface Schedule {
   id: string;
-  courseCode: string;
-  courseName: string;
+  ClassCode: string;
+  ClassName: string;
   instructor: string;
   day: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday";
   startTime: string;
@@ -16,8 +16,8 @@ interface Schedule {
 const mockSchedules: Schedule[] = [
   {
     id: "1",
-    courseCode: "CS101",
-    courseName: "Introduction to Programming",
+    ClassCode: "CS101",
+    ClassName: "Introduction to Programming",
     instructor: "Dr. John Smith",
     day: "Monday",
     startTime: "09:00",
@@ -27,8 +27,8 @@ const mockSchedules: Schedule[] = [
   },
   {
     id: "2",
-    courseCode: "MATH201",
-    courseName: "Calculus II",
+    ClassCode: "MATH201",
+    ClassName: "Calculus II",
     instructor: "Prof. Sarah Johnson",
     day: "Tuesday",
     startTime: "11:00",
@@ -38,8 +38,8 @@ const mockSchedules: Schedule[] = [
   },
   {
     id: "3",
-    courseCode: "PHYS101",
-    courseName: "Physics I",
+    ClassCode: "PHYS101",
+    ClassName: "Physics I",
     instructor: "Dr. Michael Brown",
     day: "Wednesday",
     startTime: "14:00",
@@ -122,10 +122,10 @@ export default function Schedules() {
                         {schedule && (
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">
-                              {schedule.courseCode}
+                              {schedule.ClassCode}
                             </div>
                             <div className="text-gray-500">
-                              {schedule.courseName}
+                              {schedule.ClassName}
                             </div>
                             <div className="text-gray-500">
                               {schedule.instructor}
@@ -157,7 +157,7 @@ export default function Schedules() {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-medium text-gray-900">
-                    {schedule.courseCode} - {schedule.courseName}
+                    {schedule.ClassCode} - {schedule.ClassName}
                   </p>
                   <p className="text-sm text-gray-500">
                     {schedule.day} {schedule.startTime}-{schedule.endTime}
