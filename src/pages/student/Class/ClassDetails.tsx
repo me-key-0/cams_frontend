@@ -3,7 +3,6 @@ import { Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   BookOpenIcon,
   BellIcon,
-  AcademicCapIcon,
   ClipboardDocumentListIcon,
   ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
@@ -11,7 +10,6 @@ import {
 const navigation = [
   { name: "Resources", href: "resources", icon: BookOpenIcon },
   { name: "Notifications", href: "notifications", icon: BellIcon },
-  { name: "Grades", href: "grades", icon: AcademicCapIcon },
   { name: "Assessments", href: "assessments", icon: ClipboardDocumentListIcon },
   { name: "Chat", href: "chat", icon: ChatBubbleLeftRightIcon },
 ];
