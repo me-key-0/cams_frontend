@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AcademicCapIcon } from "@heroicons/react/24/outline";
 
-interface Course {
+interface Class {
   id: string;
   code: string;
   name: string;
@@ -12,7 +12,7 @@ interface Course {
   semester: string;
 }
 
-const mockCourses: Course[] = [
+const mockClass: Class[] = [
   {
     id: "1",
     code: "CS101",
@@ -74,18 +74,18 @@ export default function Grades() {
   const [selectedYear, setSelectedYear] = useState(yearLevels[0]);
   const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
 
-  const filteredCourses = mockCourses.filter(
-    (course) =>
-      course.yearLevel === selectedYear && course.semester === selectedSemester
+  const filteredClass = mockClass.filter(
+    (Class) =>
+      Class.yearLevel === selectedYear && Class.semester === selectedSemester
   );
 
   const calculateGPA = () => {
-    const totalPoints = filteredCourses.reduce(
-      (sum, course) => sum + course.gradePoint * course.credits,
+    const totalPoints = filteredClass.reduce(
+      (sum, Class) => sum + Class.gradePoint * Class.credits,
       0
     );
-    const totalCredits = filteredCourses.reduce(
-      (sum, course) => sum + course.credits,
+    const totalCredits = filteredClass.reduce(
+      (sum, Class) => sum + Class.credits,
       0
     );
     return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : "0.00";
@@ -96,25 +96,25 @@ export default function Grades() {
     const currentSemesterOrder =
       semesterOrder[selectedSemester as keyof typeof semesterOrder];
 
-    const eligibleCourses = mockCourses.filter((course) => {
-      const courseYearOrder =
-        yearOrder[course.yearLevel as keyof typeof yearOrder];
-      const courseSemesterOrder =
-        semesterOrder[course.semester as keyof typeof semesterOrder];
+    const eligibleClass = mockClass.filter((Class) => {
+      const ClassYearOrder =
+        yearOrder[Class.yearLevel as keyof typeof yearOrder];
+      const ClassemesterOrder =
+        semesterOrder[Class.semester as keyof typeof semesterOrder];
 
       return (
-        courseYearOrder < currentYearOrder ||
-        (courseYearOrder === currentYearOrder &&
-          courseSemesterOrder <= currentSemesterOrder)
+        ClassYearOrder < currentYearOrder ||
+        (ClassYearOrder === currentYearOrder &&
+          ClassemesterOrder <= currentSemesterOrder)
       );
     });
 
-    const totalPoints = eligibleCourses.reduce(
-      (sum, course) => sum + course.gradePoint * course.credits,
+    const totalPoints = eligibleClass.reduce(
+      (sum, Class) => sum + Class.gradePoint * Class.credits,
       0
     );
-    const totalCredits = eligibleCourses.reduce(
-      (sum, course) => sum + course.credits,
+    const totalCredits = eligibleClass.reduce(
+      (sum, Class) => sum + Class.credits,
       0
     );
     return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : "0.00";
@@ -179,10 +179,10 @@ export default function Grades() {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Course Code
+                Class Code
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Course Name
+                Class Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Credits
@@ -196,22 +196,22 @@ export default function Grades() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredCourses.map((course) => (
-              <tr key={course.id}>
+            {filteredClass.map((Class) => (
+              <tr key={Class.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {course.code}
+                  {Class.code}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.name}
+                  {Class.name}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.credits}
+                  {Class.credits}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.gradePoint}
+                  {Class.gradePoint}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {course.grade}
+                  {Class.grade}
                 </td>
               </tr>
             ))}

@@ -10,14 +10,13 @@ import {
 
 const navigation = [
   { name: "Resources", href: "resources", icon: BookOpenIcon },
-  { name: "Notifications", href: "notifications", icon: BellIcon },
   { name: "Grades", href: "grades", icon: AcademicCapIcon },
   { name: "Assessments", href: "assessments", icon: ClipboardDocumentListIcon },
   { name: "Chat", href: "chat", icon: ChatBubbleLeftRightIcon },
 ];
 
-export default function CourseDetails() {
-  const { courseId } = useParams();
+export default function LecturerClassDetails() {
+  const { classId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
@@ -25,27 +24,43 @@ export default function CourseDetails() {
     return navigation.find((item) => item.href === path)?.href || "resources";
   });
 
-  // TODO: Fetch course details using courseId
-  const courseDetails = {
+  // TODO: Fetch class details using classId
+  const classDetails = {
     code: "CS101",
     name: "Introduction to Programming",
     instructor: "Dr. John Smith",
     credits: 3,
+    students: 45,
+    schedule: "Mon, Wed 9:00 AM - 10:30 AM",
+    room: "Room 101",
   };
 
   return (
     <div className="space-y-6">
-      {/* Course Header */}
+      {/* Class Header */}
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            {courseDetails.code}
+            {classDetails.code}
           </h1>
-          <p className="mt-1 text-lg text-gray-500">{courseDetails.name}</p>
-          <p className="mt-1 text-sm text-gray-500">
-            Instructor: {courseDetails.instructor} | Credits:{" "}
-            {courseDetails.credits}
-          </p>
+          <p className="mt-1 text-lg text-gray-500">{classDetails.name}</p>
+          <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <p className="text-sm text-gray-500">
+              Instructor: {classDetails.instructor}
+            </p>
+            <p className="text-sm text-gray-500">
+              Credits: {classDetails.credits}
+            </p>
+            <p className="text-sm text-gray-500">
+              Students: {classDetails.students}
+            </p>
+            <p className="text-sm text-gray-500">
+              Schedule: {classDetails.schedule}
+            </p>
+            <p className="text-sm text-gray-500">
+              Room: {classDetails.room}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -60,7 +75,7 @@ export default function CourseDetails() {
                   key={item.name}
                   onClick={() => {
                     setActiveTab(item.href);
-                    navigate(`/student/courses/${courseId}/${item.href}`);
+                    navigate(`/lecturer/classes/${classId}/${item.href}`);
                   }}
                   className={`
                     group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium
@@ -98,4 +113,4 @@ export default function CourseDetails() {
       </div>
     </div>
   );
-}
+} 

@@ -21,12 +21,12 @@ interface Resource {
 const mockResources: Resource[] = [
   {
     id: "1",
-    title: "Course Syllabus",
+    title: "Class Syllabus",
     type: "pdf",
     size: "2.4 MB",
     uploadedAt: "2024-01-15",
     url: "/mock-url/syllabus.pdf",
-    category: "Course Information",
+    category: "Class Information",
   },
   {
     id: "2",
@@ -48,24 +48,24 @@ const mockResources: Resource[] = [
   },
   {
     id: "4",
-    title: "Course Schedule",
+    title: "Class Schedule",
     type: "image",
     size: "800 KB",
     uploadedAt: "2024-01-18",
     url: "/mock-url/schedule.png",
-    category: "Course Information",
+    category: "Class Information",
   },
 ];
 
 const categories = [
   "All",
-  "Course Information",
+  "Class Information",
   "Lecture Notes",
   "Assignments",
 ];
 
-export default function CourseResources() {
-  const { courseId } = useParams();
+export default function ClassResources() {
+  const { ClassId } = useParams();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 

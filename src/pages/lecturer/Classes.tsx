@@ -7,7 +7,7 @@ import {
   AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 
-interface Course {
+interface Class {
   id: string;
   code: string;
   name: string;
@@ -20,7 +20,7 @@ interface Course {
 }
 
 // Mock data - replace with actual API calls
-const mockCourses: Course[] = [
+const mockClass: Class[] = [
   {
     id: "1",
     code: "CS101",
@@ -61,14 +61,14 @@ export default function Classes() {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
-  const filteredCourses = mockCourses.filter(
-    (course) =>
-      course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.code.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredClass = mockClass.filter(
+    (Class) =>
+      Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      Class.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCourseClick = (courseId: string) => {
-    navigate(`/lecturer/classes/${courseId}/resources`);
+  const handleClassClick = (ClassId: string) => {
+    navigate(`/lecturer/classes/${ClassId}/resources`);
   };
 
   return (
@@ -101,51 +101,51 @@ export default function Classes() {
         </div>
       </div>
 
-      {/* Course Grid */}
+      {/* Class Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredCourses.map((course) => (
+        {filteredClass.map((Class) => (
           <div
-            key={course.id}
-            onClick={() => handleCourseClick(course.id)}
+            key={Class.id}
+            onClick={() => handleClassClick(Class.id)}
             className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer"
           >
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h4 className="text-lg font-medium text-gray-900">
-                    {course.code}
+                    {Class.code}
                   </h4>
-                  <p className="mt-1 text-sm text-gray-500">{course.name}</p>
+                  <p className="mt-1 text-sm text-gray-500">{Class.name}</p>
                 </div>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    course.status === "Active"
+                    Class.status === "Active"
                       ? "bg-green-100 text-green-800"
-                      : course.status === "Upcoming"
+                      : Class.status === "Upcoming"
                       ? "bg-blue-100 text-blue-800"
                       : "bg-gray-100 text-gray-800"
                   }`}
                 >
-                  {course.status}
+                  {Class.status}
                 </span>
               </div>
 
               <div className="mt-4 space-y-2">
                 <div className="flex items-center text-sm text-gray-500">
                   <UserGroupIcon className="h-5 w-5 mr-2" />
-                  {course.students} Students
+                  {Class.students} Students
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <ClockIcon className="h-5 w-5 mr-2" />
-                  {course.schedule}
+                  {Class.schedule}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <BookOpenIcon className="h-5 w-5 mr-2" />
-                  {course.room}
+                  {Class.room}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <AcademicCapIcon className="h-5 w-5 mr-2" />
-                  {course.credits} Credits
+                  {Class.credits} Credits
                 </div>
               </div>
             </div>

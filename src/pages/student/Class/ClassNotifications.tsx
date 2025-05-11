@@ -23,7 +23,7 @@ const mockNotifications: Notification[] = [
   },
   {
     id: "2",
-    title: "New Course Material Available",
+    title: "New Class Material Available",
     content: "Week 5 lecture notes and slides have been uploaded.",
     type: "announcement",
     date: "2024-03-26",
@@ -39,8 +39,8 @@ const mockNotifications: Notification[] = [
   },
 ];
 
-export default function CourseNotifications() {
-  const { courseId } = useParams();
+export default function ClassNotifications() {
+  const { ClassId } = useParams();
   const [notifications, setNotifications] = useState(mockNotifications);
 
   const markAsRead = (id: string) => {
@@ -57,7 +57,7 @@ export default function CourseNotifications() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">
-          Course Notifications
+          Class Notifications
         </h2>
         <div className="flex items-center text-sm text-gray-500">
           <BellIcon className="h-5 w-5 mr-2" />
