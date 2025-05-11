@@ -4,12 +4,13 @@ import {
   ClipboardDocumentListIcon,
   DocumentIcon,
   ClockIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 
 interface Assessment {
   id: string;
   title: string;
-  type: "assignment" | "project" | "quiz";
+  type: "assignment" | "project" | "quiz" | "exam";
   description: string;
   dueDate: string;
   attachments?: {
@@ -80,6 +81,27 @@ const mockAssessments: Assessment[] = [
         "Excellent performance! You have a strong understanding of the concepts.",
     },
   },
+  {
+    id: "4",
+    title: "Midterm Exam",
+    type: "exam",
+    description: "Covers chapters 1-5 of the course textbook.",
+    dueDate: "2024-03-15",
+    status: "graded",
+    grade: {
+      score: 85,
+      maxScore: 100,
+      feedback: "Good work! Consider reviewing chapter 3 for the final exam.",
+    },
+  },
+  {
+    id: "5",
+    title: "Final Exam",
+    type: "exam",
+    description: "Covers all chapters of the course textbook.",
+    dueDate: "2024-05-20",
+    status: "pending",
+  },
 ];
 
 export default function ClassAssessments() {
@@ -99,8 +121,37 @@ export default function ClassAssessments() {
     }
   };
 
+  const calculateTotalGrade = () => {
+    return assessments.reduce((total, assessment) => {
+      if (assessment.grade) {
+        const gradePercentage =
+          (assessment.grade.score / assessment.grade.maxScore) * 100;
+        return total + gradePercentage;
+      }
+      return total;
+    }, 0);
+  };
+
   return (
     <div className="space-y-6">
+      {/* Grade Summary */}
+      <div className="bg-white shadow sm:rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <div className="flex items-center">
+            <AcademicCapIcon className="h-8 w-8 text-primary-500 mr-3" />
+            <div>
+              <h2 className="text-lg font-medium text-gray-900">
+                Grade Summary
+              </h2>
+              <p className="mt-1 text-3xl font-semibold text-primary-600">
+                {calculateTotalGrade().toFixed(1)}%
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Assessments List */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">
           Class Assessments

@@ -21,7 +21,6 @@ import StudentContactAdmin from "./pages/student/ContactAdmin";
 import ClassDetails from "./pages/student/Class/ClassDetails";
 import ClassResources from "./pages/student/Class/ClassResources";
 import ClassNotifications from "./pages/student/Class/ClassNotifications";
-import ClassGrades from "./pages/student/Class/ClassGrades";
 import ClassAssessments from "./pages/student/Class/ClassAssessments";
 import ClassChat from "./pages/student/Class/ClassChat";
 
@@ -78,7 +77,6 @@ function App() {
             >
               <Route path="resources" element={<ClassResources />} />
               <Route path="notifications" element={<ClassNotifications />} />
-              <Route path="grades" element={<ClassGrades />} />
               <Route path="assessments" element={<ClassAssessments />} />
               <Route path="chat" element={<ClassChat />} />
             </Route>
