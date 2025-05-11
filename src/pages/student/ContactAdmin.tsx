@@ -65,9 +65,9 @@ export default function ContactAdmin() {
               >
                 Subject
               </label>
-              <input
-                type="text"
+              <textarea
                 id="subject"
+                rows={4}
                 value={formData.subject}
                 onChange={(e) =>
                   setFormData({ ...formData, subject: e.target.value })
@@ -153,7 +153,7 @@ export default function ContactAdmin() {
                 What information should I include in my message?
               </h4>
               <p className="mt-1 text-sm text-gray-500">
-                Please include your student ID, relevant course codes, and any
+                Please include your student ID, relevant Class codes, and any
                 specific details related to your inquiry.
               </p>
             </div>

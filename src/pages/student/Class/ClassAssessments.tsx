@@ -82,8 +82,8 @@ const mockAssessments: Assessment[] = [
   },
 ];
 
-export default function CourseAssessments() {
-  const { courseId } = useParams();
+export default function ClassAssessments() {
+  const { ClassId } = useParams();
   const [assessments] = useState(mockAssessments);
 
   const getStatusColor = (status: Assessment["status"]) => {
@@ -103,7 +103,7 @@ export default function CourseAssessments() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">
-          Course Assessments
+          Class Assessments
         </h2>
         <div className="flex items-center text-sm text-gray-500">
           <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />

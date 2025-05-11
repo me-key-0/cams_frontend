@@ -29,7 +29,7 @@ const studentNavigation = [
     icon: CalculatorIcon,
   },
   { name: "Schedules", href: "/student/schedules", icon: CalendarIcon },
-  { name: "Courses", href: "/student/courses", icon: BookOpenIcon },
+  { name: "Class", href: "/student/Class", icon: BookOpenIcon },
   {
     name: "Contact Admin",
     href: "/student/contact-admin",

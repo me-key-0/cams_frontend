@@ -16,14 +16,14 @@ import StudentAnnouncements from "./pages/student/Announcements";
 import StudentGrades from "./pages/student/Grades";
 import StudentGPACalculator from "./pages/student/GPACalculator";
 import StudentSchedules from "./pages/student/Schedules";
-import StudentCourses from "./pages/student/Courses";
+import StudentClass from "./pages/student/Class";
 import StudentContactAdmin from "./pages/student/ContactAdmin";
-import CourseDetails from "./pages/student/courses/CourseDetails";
-import CourseResources from "./pages/student/courses/CourseResources";
-import CourseNotifications from "./pages/student/courses/CourseNotifications";
-import CourseGrades from "./pages/student/courses/CourseGrades";
-import CourseAssessments from "./pages/student/courses/CourseAssessments";
-import CourseChat from "./pages/student/courses/CourseChat";
+import ClassDetails from "./pages/student/Class/ClassDetails";
+import ClassResources from "./pages/student/Class/ClassResources";
+import ClassNotifications from "./pages/student/Class/ClassNotifications";
+import ClassGrades from "./pages/student/Class/ClassGrades";
+import ClassAssessments from "./pages/student/Class/ClassAssessments";
+import ClassChat from "./pages/student/Class/ClassChat";
 
 // Lecturer imports
 import LecturerDashboard from "./pages/lecturer/Dashboard";
@@ -33,7 +33,7 @@ import LecturerAssessments from "./pages/lecturer/classes/ClassesAssessments";
 import LecturerChat from "./pages/lecturer/Chat";
 import LecturerContactAdmin from "./pages/lecturer/ContactAdmin";
 import Classes from "./pages/lecturer/Classes";
-import ClassDetails from "./pages/lecturer/classes/ClassDetails";
+import ClassesDetails from "./pages/lecturer/classes/ClassesDetails";
 import Grades from "./pages/student/Grades";
 import ClassesResources from "./pages/lecturer/classes/ClassesResources";
 import ClassesGrades from "./pages/lecturer/classes/ClassesGrades";
@@ -65,22 +65,22 @@ function App() {
               element={<StudentGPACalculator />}
             />
             <Route path="/student/schedules" element={<StudentSchedules />} />
-            <Route path="/student/courses" element={<StudentCourses />} />
+            <Route path="/student/Class" element={<StudentClass />} />
             <Route
               path="/student/contact-admin"
               element={<StudentContactAdmin />}
             />
 
-            {/* Course Routes */}
+            {/* Class Routes */}
             <Route
-              path="/student/courses/:courseId"
-              element={<CourseDetails />}
+              path="/student/Class/:ClassId"
+              element={<ClassDetails />}
             >
-              <Route path="resources" element={<CourseResources />} />
-              <Route path="notifications" element={<CourseNotifications />} />
-              <Route path="grades" element={<CourseGrades />} />
-              <Route path="assessments" element={<CourseAssessments />} />
-              <Route path="chat" element={<CourseChat />} />
+              <Route path="resources" element={<ClassResources />} />
+              <Route path="notifications" element={<ClassNotifications />} />
+              <Route path="grades" element={<ClassGrades />} />
+              <Route path="assessments" element={<ClassAssessments />} />
+              <Route path="chat" element={<ClassChat />} />
             </Route>
           </Route>
         </Route>
@@ -94,7 +94,7 @@ function App() {
               element={<LecturerAnnouncements />}
             />
             <Route path="/lecturer/classes" element={<Classes />} />
-            <Route path="/lecturer/classes/:classId" element={<ClassDetails />}>
+            <Route path="/lecturer/classes/:classId" element={<ClassesDetails />}>
               <Route path="resources" element={<ClassesResources />} />
               <Route path="grades" element={<ClassesGrades />} />
               <Route path="assessments" element={<ClassesAssessments />} />

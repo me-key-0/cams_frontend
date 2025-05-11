@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 
-interface CourseInput {
+interface ClassInput {
   id: string;
   name: string;
   credits: number;
@@ -26,13 +26,13 @@ const gradePoints: { [key: string]: number } = {
 const grades = Object.keys(gradePoints);
 
 export default function GPACalculator() {
-  const [courses, setCourses] = useState<CourseInput[]>([
+  const [Class, setClass] = useState<ClassInput[]>([
     { id: "1", name: "", credits: 0, grade: "A" },
   ]);
 
-  const addCourse = () => {
-    setCourses([
-      ...courses,
+  const addClass = () => {
+    setClass([
+      ...Class,
       {
         id: Date.now().toString(),
         name: "",
@@ -42,20 +42,20 @@ export default function GPACalculator() {
     ]);
   };
 
-  const removeCourse = (id: string) => {
-    if (courses.length > 1) {
-      setCourses(courses.filter((course) => course.id !== id));
+  const removeClass = (id: string) => {
+    if (Class.length > 1) {
+      setClass(Class.filter((Class) => Class.id !== id));
     }
   };
 
-  const updateCourse = (
+  const updateClass = (
     id: string,
-    field: keyof CourseInput,
+    field: keyof ClassInput,
     value: string | number
   ) => {
-    setCourses(
-      courses.map((course) =>
-        course.id === id ? { ...course, [field]: value } : course
+    setClass(
+      Class.map((Class) =>
+        Class.id === id ? { ...Class, [field]: value } : Class
       )
     );
   };
@@ -64,10 +64,10 @@ export default function GPACalculator() {
     let totalPoints = 0;
     let totalCredits = 0;
 
-    courses.forEach((course) => {
-      if (course.credits > 0) {
-        totalPoints += gradePoints[course.grade] * course.credits;
-        totalCredits += course.credits;
+    Class.forEach((Class) => {
+      if (Class.credits > 0) {
+        totalPoints += gradePoints[Class.grade] * Class.credits;
+        totalCredits += Class.credits;
       }
     });
 
@@ -82,7 +82,7 @@ export default function GPACalculator() {
             GPA Calculator
           </h3>
           <div className="mt-2 max-w-xl text-sm text-gray-500">
-            <p>Enter your courses and grades to calculate your GPA.</p>
+            <p>Enter your Class and grades to calculate your GPA.</p>
           </div>
         </div>
       </div>
@@ -90,22 +90,22 @@ export default function GPACalculator() {
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <div className="space-y-6">
-            {courses.map((course) => (
-              <div key={course.id} className="flex items-start space-x-4">
+            {Class.map((Class) => (
+              <div key={Class.id} className="flex items-start space-x-4">
                 <div className="flex-1 grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <div>
                     <label
-                      htmlFor={`course-name-${course.id}`}
+                      htmlFor={`Class-name-${Class.id}`}
                       className="block text-sm font-medium text-gray-700"
                     >
-                      Course Name
+                      Class Name
                     </label>
                     <input
                       type="text"
-                      id={`course-name-${course.id}`}
-                      value={course.name}
+                      id={`Class-name-${Class.id}`}
+                      value={Class.name}
                       onChange={(e) =>
-                        updateCourse(course.id, "name", e.target.value)
+                        updateClass(Class.id, "name", e.target.value)
                       }
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                       placeholder="e.g., Introduction to Programming"
@@ -113,18 +113,18 @@ export default function GPACalculator() {
                   </div>
                   <div>
                     <label
-                      htmlFor={`credits-${course.id}`}
+                      htmlFor={`credits-${Class.id}`}
                       className="block text-sm font-medium text-gray-700"
                     >
                       Credits
                     </label>
                     <input
                       type="number"
-                      id={`credits-${course.id}`}
-                      value={course.credits}
+                      id={`credits-${Class.id}`}
+                      value={Class.credits}
                       onChange={(e) =>
-                        updateCourse(
-                          course.id,
+                        updateClass(
+                          Class.id,
                           "credits",
                           parseInt(e.target.value) || 0
                         )
@@ -136,16 +136,16 @@ export default function GPACalculator() {
                   </div>
                   <div>
                     <label
-                      htmlFor={`grade-${course.id}`}
+                      htmlFor={`grade-${Class.id}`}
                       className="block text-sm font-medium text-gray-700"
                     >
                       Grade
                     </label>
                     <select
-                      id={`grade-${course.id}`}
-                      value={course.grade}
+                      id={`grade-${Class.id}`}
+                      value={Class.grade}
                       onChange={(e) =>
-                        updateCourse(course.id, "grade", e.target.value)
+                        updateClass(Class.id, "grade", e.target.value)
                       }
                       className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                     >
@@ -157,10 +157,10 @@ export default function GPACalculator() {
                     </select>
                   </div>
                 </div>
-                {courses.length > 1 && (
+                {Class.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeCourse(course.id)}
+                    onClick={() => removeClass(Class.id)}
                     className="mt-8 inline-flex items-center p-1 border border-transparent rounded-full text-red-600 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   >
                     <TrashIcon className="h-5 w-5" aria-hidden="true" />
@@ -173,11 +173,11 @@ export default function GPACalculator() {
           <div className="mt-6">
             <button
               type="button"
-              onClick={addCourse}
+              onClick={addClass}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               <PlusIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-              Add Course
+              Add Class
             </button>
           </div>
         </div>

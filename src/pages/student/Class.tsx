@@ -7,7 +7,7 @@ import {
   AcademicCapIcon,
 } from "@heroicons/react/24/outline";
 
-interface Course {
+interface Class {
   id: string;
   code: string;
   name: string;
@@ -20,7 +20,7 @@ interface Course {
 }
 
 // Mock data - replace with actual API calls
-const mockCourses: Course[] = [
+const mockClass: Class[] = [
   {
     id: "1",
     code: "CS101",
@@ -64,19 +64,19 @@ const mockCourses: Course[] = [
   },
 ];
 
-export default function Courses() {
+export default function Class() {
   const [selectedSemester, setSelectedSemester] = useState("Spring 2024");
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
-  const filteredCourses = mockCourses.filter(
-    (course) =>
-      course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.code.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredClass = mockClass.filter(
+    (Class) =>
+      Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      Class.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCourseClick = (courseId: string) => {
-    navigate(`/student/courses/${courseId}/resources`);
+  const handleClassClick = (ClassId: string) => {
+    navigate(`/student/Class/${ClassId}/resources`);
   };
 
   return (
@@ -86,7 +86,7 @@ export default function Courses() {
         <div className="px-4 py-5 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h3 className="text-lg font-medium leading-6 text-gray-900">
-              My Courses
+              My Classes
             </h3>
             <div className="flex gap-4">
               <select
@@ -99,7 +99,7 @@ export default function Courses() {
               </select>
               <input
                 type="text"
-                placeholder="Search courses..."
+                placeholder="Search Class..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
@@ -109,59 +109,59 @@ export default function Courses() {
         </div>
       </div>
 
-      {/* Course Grid */}
+      {/* Class Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredCourses.map((course) => (
+        {filteredClass.map((Class) => (
           <div
-            key={course.id}
-            onClick={() => handleCourseClick(course.id)}
+            key={Class.id}
+            onClick={() => handleClassClick(Class.id)}
             className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer"
           >
             <div className="px-4 py-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <h4 className="text-lg font-medium text-gray-900">
-                    {course.code}
+                    {Class.code}
                   </h4>
-                  <p className="mt-1 text-sm text-gray-500">{course.name}</p>
+                  <p className="mt-1 text-sm text-gray-500">{Class.name}</p>
                 </div>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    course.status === "Completed"
+                    Class.status === "Completed"
                       ? "bg-green-100 text-green-800"
-                      : course.status === "In Progress"
+                      : Class.status === "In Progress"
                       ? "bg-blue-100 text-blue-800"
                       : "bg-yellow-100 text-yellow-800"
                   }`}
                 >
-                  {course.status}
+                  {Class.status}
                 </span>
               </div>
 
               <div className="mt-4 space-y-3">
                 <div className="flex items-center text-sm text-gray-500">
                   <UserGroupIcon className="h-5 w-5 mr-2" />
-                  {course.instructor}
+                  {Class.instructor}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <ClockIcon className="h-5 w-5 mr-2" />
-                  {course.schedule}
+                  {Class.schedule}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <BookOpenIcon className="h-5 w-5 mr-2" />
-                  {course.room}
+                  {Class.room}
                 </div>
                 <div className="flex items-center text-sm text-gray-500">
                   <AcademicCapIcon className="h-5 w-5 mr-2" />
-                  {course.credits} Credits
+                  {Class.credits} Credits
                 </div>
               </div>
 
-              {course.grade && (
+              {Class.grade && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <p className="text-sm font-medium text-gray-900">
                     Final Grade:{" "}
-                    <span className="text-primary-600">{course.grade}</span>
+                    <span className="text-primary-600">{Class.grade}</span>
                   </p>
                 </div>
               )}

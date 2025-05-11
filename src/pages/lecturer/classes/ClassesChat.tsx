@@ -62,7 +62,7 @@ const mockMessages: { [key: string]: Message[] } = {
       id: "2",
       senderId: "lecturer",
       senderName: "Dr. Sarah Wilson",
-      content: "Of course! What specific part would you like me to explain?",
+      content: "Of Class! What specific part would you like me to explain?",
       timestamp: "2024-03-15T10:35:00",
       isRead: true,
     },

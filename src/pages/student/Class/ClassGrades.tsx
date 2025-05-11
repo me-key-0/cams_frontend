@@ -47,8 +47,8 @@ const mockGrades: Grade[] = [
   },
 ];
 
-export default function CourseGrades() {
-  const { courseId } = useParams();
+export default function ClassGrades() {
+  const { ClassId } = useParams();
   const [grades] = useState(mockGrades);
 
   const calculateTotalGrade = () => {

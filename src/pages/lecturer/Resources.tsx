@@ -61,7 +61,7 @@ const mockResources: Resource[] = [
   {
     id: "3",
     title: "Video Tutorials",
-    description: "Collection of video tutorials for the course",
+    description: "Collection of video tutorials for the Class",
     type: "folder",
     category: "Tutorials",
     uploadDate: "2024-03-13",
@@ -125,7 +125,7 @@ export default function LecturerResources() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Course Resources</h2>
+        <h2 className="text-lg font-medium text-gray-900">Class Resources</h2>
         <button
           onClick={() => setIsCreating(true)}
           className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
