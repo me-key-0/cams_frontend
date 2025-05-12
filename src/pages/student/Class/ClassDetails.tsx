@@ -6,6 +6,7 @@ import {
   AcademicCapIcon,
   ClipboardDocumentListIcon,
   ChatBubbleLeftRightIcon,
+  ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 
 const navigation = [
@@ -14,6 +15,7 @@ const navigation = [
   { name: "Grades", href: "grades", icon: AcademicCapIcon },
   { name: "Assessments", href: "assessments", icon: ClipboardDocumentListIcon },
   { name: "Chat", href: "chat", icon: ChatBubbleLeftRightIcon },
+  { name: "Evaluation", href: "evaluation", icon: ClipboardDocumentCheckIcon },
 ];
 
 export default function ClassDetails() {
