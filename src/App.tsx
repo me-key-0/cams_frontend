@@ -23,6 +23,7 @@ import ClassResources from "./pages/student/Class/ClassResources";
 import ClassNotifications from "./pages/student/Class/ClassNotifications";
 import ClassAssessments from "./pages/student/Class/ClassAssessments";
 import ClassChat from "./pages/student/Class/ClassChat";
+import ClassEvaluation from "./pages/student/Class/ClassEvaluation";
 
 // Lecturer imports
 import LecturerDashboard from "./pages/lecturer/Dashboard";
@@ -79,6 +80,7 @@ function App() {
               <Route path="notifications" element={<ClassNotifications />} />
               <Route path="assessments" element={<ClassAssessments />} />
               <Route path="chat" element={<ClassChat />} />
+              <Route path="evaluation" element={<ClassEvaluation />} />
             </Route>
           </Route>
         </Route>
