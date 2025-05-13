@@ -64,8 +64,19 @@ const mockClass: Class[] = [
   },
 ];
 
+const yearSemesters = [
+  "1st Year 1st Semester",
+  "1st Year 2nd Semester",
+  "2nd Year 1st Semester",
+  "2nd Year 2nd Semester",
+  "3rd Year 1st Semester",
+  "3rd Year 2nd Semester",
+  "4th Year 1st Semester",
+  "4th Year 2nd Semester",
+];
+
 export default function Class() {
-  const [selectedSemester, setSelectedSemester] = useState("Spring 2024");
+  const [selectedSemester, setSelectedSemester] = useState("1st Year 1st Semester");
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
@@ -94,8 +105,11 @@ export default function Class() {
                 onChange={(e) => setSelectedSemester(e.target.value)}
                 className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
               >
-                <option value="Spring 2024">Spring 2024</option>
-                <option value="Fall 2023">Fall 2023</option>
+                {yearSemesters.map((semester) => (
+                  <option key={semester} value={semester}>
+                    {semester}
+                  </option>
+                ))}
               </select>
               <input
                 type="text"
