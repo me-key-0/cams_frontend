@@ -10,9 +10,9 @@ interface Schedule {
   endTime: string;
   room: string;
   semester: string;
+  yearLevel: string;
 }
 
-// Mock data - replace with actual API calls
 const mockSchedules: Schedule[] = [
   {
     id: "1",
@@ -23,7 +23,8 @@ const mockSchedules: Schedule[] = [
     startTime: "09:00",
     endTime: "10:30",
     room: "Room 101",
-    semester: "Spring 2024",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "2",
@@ -34,7 +35,8 @@ const mockSchedules: Schedule[] = [
     startTime: "11:00",
     endTime: "12:30",
     room: "Room 202",
-    semester: "Spring 2024",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "3",
@@ -45,7 +47,8 @@ const mockSchedules: Schedule[] = [
     startTime: "14:00",
     endTime: "15:30",
     room: "Room 303",
-    semester: "Spring 2024",
+    yearLevel: "1st Year",
+    semester: "2nd Semester",
   },
 ];
 
@@ -57,11 +60,13 @@ const timeSlots = Array.from({ length: 14 }, (_, i) => {
 });
 
 export default function Schedules() {
-  const [selectedSemester, setSelectedSemester] = useState("Spring 2024");
+ const [selectedYear, setSelectedYear] = useState("1st Year");
+const [selectedSemester, setSelectedSemester] = useState("1st Semester");
 
-  const filteredSchedules = mockSchedules.filter(
-    (schedule) => schedule.semester === selectedSemester
-  );
+const filteredSchedules = mockSchedules.filter(
+  (schedule) =>
+    schedule.yearLevel === selectedYear && schedule.semester === selectedSemester
+);
 
   return (
     <div className="space-y-6">
@@ -72,14 +77,33 @@ export default function Schedules() {
             <h3 className="text-lg font-medium leading-6 text-gray-900">
               Class Schedule
             </h3>
-            <select
-              value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-            >
-              <option value="Spring 2024">Spring 2024</option>
-              <option value="Fall 2023">Fall 2023</option>
-            </select>
+            <div className="flex items-center space-x-4">
+              {/* Year Dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="min-w-[130px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              >
+                {["1st Year", "2nd Year", "3rd Year", "4th Year"].map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+
+              {/* Semester Dropdown */}
+              <select
+                value={selectedSemester}
+                onChange={(e) => setSelectedSemester(e.target.value)}
+                className="min-w-[150px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              >
+                {["1st Semester", "2nd Semester"].map((semester) => (
+                  <option key={semester} value={semester}>
+                    {semester}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>

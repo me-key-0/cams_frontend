@@ -85,16 +85,12 @@ export default function Announcements() {
             <div className="flex-1 max-w-lg">
               <div className="relative rounded-md shadow-sm">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FunnelIcon
-                    className="h-5 w-5 text-gray-400"
-                    aria-hidden="true"
-                  />
                 </div>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="focus:ring-primary-500 focus:border-primary-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-md"
+                  className="block w-full pl-4 pr-12 py-3 text-lg focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-lg rounded-md shadow-sm"
                   placeholder="Search announcements..."
                 />
               </div>
