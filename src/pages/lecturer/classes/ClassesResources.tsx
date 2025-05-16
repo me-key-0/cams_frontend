@@ -175,7 +175,7 @@ export default function LecturerResources() {
           placeholder="Search resources..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          className="block w-full pl-4 pr-12 py-3 text-lg border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-lg rounded-md"
         />
         <select
           value={selectedCategory}
