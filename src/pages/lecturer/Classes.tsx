@@ -17,6 +17,8 @@ interface Class {
   room: string;
   status: "Active" | "Completed" | "Upcoming";
   students: number;
+  yearLevel: string;   
+  semester: string;
 }
 
 // Mock data - replace with actual API calls
@@ -31,6 +33,8 @@ const mockClass: Class[] = [
     room: "Room 101",
     status: "Active",
     students: 45,
+    yearLevel: "1st Year",      
+    semester: "1st Semester",   
   },
   {
     id: "2",
@@ -42,6 +46,8 @@ const mockClass: Class[] = [
     room: "Room 202",
     status: "Active",
     students: 38,
+    yearLevel: "1st Year",     
+    semester: "1st Semester",   
   },
   {
     id: "3",
@@ -53,19 +59,29 @@ const mockClass: Class[] = [
     room: "Room 303",
     status: "Upcoming",
     students: 42,
+    yearLevel: "1st Year",      
+    semester: "2nd Semester",   
   },
 ];
+// Add year and semester options
+const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+const semesters = ["1st Semester", "2nd Semester"];
 
 export default function Classes() {
-  const [selectedSemester, setSelectedSemester] = useState("Spring 2024");
+  const [selectedYear, setSelectedYear] = useState(yearLevels[0]);
+  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
   const filteredClass = mockClass.filter(
-    (Class) =>
+  (Class) =>
+    (Class.yearLevel === selectedYear) &&
+    (Class.semester === selectedSemester) &&
+    (
       Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       Class.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    )
+);
 
   const handleClassClick = (ClassId: string) => {
     navigate(`/lecturer/classes/${ClassId}/resources`);
@@ -80,21 +96,37 @@ export default function Classes() {
             <h3 className="text-lg font-medium leading-6 text-gray-900">
               My Classes
             </h3>
-            <div className="flex gap-4">
+            <div className="flex items-center space-x-4">
+              {/* Year dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="min-w-[130px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              >
+                {yearLevels.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              {/* Semester dropdown */}
               <select
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                className="min-w-[150px] ml-2 pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               >
-                <option value="Spring 2024">Spring 2024</option>
-                <option value="Fall 2023">Fall 2023</option>
+                {semesters.map((semester) => (
+                  <option key={semester} value={semester}>
+                    {semester}
+                  </option>
+                ))}
               </select>
               <input
                 type="text"
                 placeholder="Search classes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                className="block w-full pl-4 pr-12 py-3 text-lg border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-lg rounded-md"
               />
             </div>
           </div>
@@ -154,4 +186,4 @@ export default function Classes() {
       </div>
     </div>
   );
-} 
+}
