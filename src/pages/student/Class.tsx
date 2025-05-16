@@ -17,6 +17,8 @@ interface Class {
   room: string;
   status: "Enrolled" | "Completed" | "In Progress";
   grade?: string;
+  yearLevel: string;    
+  semester: string;     
 }
 
 // Mock data - replace with actual API calls
@@ -30,6 +32,8 @@ const mockClass: Class[] = [
     schedule: "Mon, Wed 9:00 AM - 10:30 AM",
     room: "Room 101",
     status: "In Progress",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "2",
@@ -40,6 +44,8 @@ const mockClass: Class[] = [
     schedule: "Tue, Thu 11:00 AM - 12:30 PM",
     room: "Room 202",
     status: "In Progress",
+    yearLevel: "1st Year",
+    semester: "1st Semester",
   },
   {
     id: "3",
@@ -50,6 +56,8 @@ const mockClass: Class[] = [
     schedule: "Mon, Wed 2:00 PM - 3:30 PM",
     room: "Room 303",
     status: "In Progress",
+    yearLevel: "1st Year",
+    semester: "2nd Semester",
   },
   {
     id: "4",
@@ -61,29 +69,29 @@ const mockClass: Class[] = [
     room: "Room 404",
     status: "Completed",
     grade: "A",
+    yearLevel: "1st Year",
+    semester: "2nd Semester",
   },
 ];
 
-const yearSemesters = [
-  "1st Year 1st Semester",
-  "1st Year 2nd Semester",
-  "2nd Year 1st Semester",
-  "2nd Year 2nd Semester",
-  "3rd Year 1st Semester",
-  "3rd Year 2nd Semester",
-  "4th Year 1st Semester",
-  "4th Year 2nd Semester",
-];
+const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+const semesters = ["1st Semester", "2nd Semester"];
 
 export default function Class() {
-  const [selectedSemester, setSelectedSemester] = useState("1st Year 1st Semester");
+  const [selectedYear, setSelectedYear] = useState(yearLevels[0]);
+  const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
+  // Filter by year, semester, and search query
   const filteredClass = mockClass.filter(
     (Class) =>
-      Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      Class.code.toLowerCase().includes(searchQuery.toLowerCase())
+      Class.yearLevel === selectedYear &&
+      Class.semester === selectedSemester &&
+      (
+        Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        Class.code.toLowerCase().includes(searchQuery.toLowerCase())
+      )
   );
 
   const handleClassClick = (ClassId: string) => {
@@ -99,13 +107,26 @@ export default function Class() {
             <h3 className="text-lg font-medium leading-6 text-gray-900">
               My Classes
             </h3>
-            <div className="flex gap-4">
+            <div className="flex items-center space-x-4">
+              {/* Year dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="min-w-[130px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+              >
+                {yearLevels.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              {/* Semester dropdown */}
               <select
                 value={selectedSemester}
                 onChange={(e) => setSelectedSemester(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                className="min-w-[150px] ml-2 pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               >
-                {yearSemesters.map((semester) => (
+                {semesters.map((semester) => (
                   <option key={semester} value={semester}>
                     {semester}
                   </option>
@@ -122,7 +143,6 @@ export default function Class() {
           </div>
         </div>
       </div>
-
       {/* Class Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filteredClass.map((Class) => (
