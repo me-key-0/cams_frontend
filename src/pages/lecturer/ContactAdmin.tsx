@@ -120,9 +120,9 @@ export default function LecturerContactAdmin() {
             >
               Subject
             </label>
-            <input
-              type="text"
+            <textarea
               id="subject"
+              rows={4}
               value={newTicket.subject}
               onChange={(e) =>
                 setNewTicket({ ...newTicket, subject: e.target.value })
