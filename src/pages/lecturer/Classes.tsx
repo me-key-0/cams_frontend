@@ -27,7 +27,7 @@ export default function Classes() {
         setError(null);
         
         // TODO: Get actual lecturerId from auth context
-        const lecturerId = 101;
+        const lecturerId = 1;
         console.log('Fetching assignments for lecturer:', lecturerId);
         const response = await assignmentService.getAssignmentSessions(lecturerId);
         console.log('Received assignments:', response);

@@ -10,12 +10,22 @@ const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
+    // 'Access-Control-Allow-Origin': 'http://localhost:5173',
+    // 'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
+    // 'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
   },
+  // withCredentials: true
 });
 
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Add token to request if available
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
     // Add API prefix to all requests
     if (config.url && !config.url.startsWith(API_PREFIX)) {
       config.url = `${API_PREFIX}${config.url}`;
@@ -37,8 +47,9 @@ api.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          // Handle unauthorized
-          console.error('Unauthorized access');
+          // Handle unauthorized - clear token and redirect to login
+          localStorage.removeItem('token');
+          window.location.href = '/login';
           break;
         case 404:
           // Handle not found

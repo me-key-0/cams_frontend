@@ -19,7 +19,7 @@ import StudentSchedules from "./pages/student/Schedules";
 import StudentClass from "./pages/student/Class";
 import StudentContactAdmin from "./pages/student/ContactAdmin";
 import ClassDetails from "./pages/student/Class/ClassDetails";
-import ClassResources from "./pages/student/Class/ClassResources";
+import StudentClassResources from "./pages/student/ClassResources";
 import ClassNotifications from "./pages/student/Class/ClassNotifications";
 import ClassAssessments from "./pages/student/Class/ClassAssessments";
 import ClassChat from "./pages/student/Class/ClassChat";
@@ -35,7 +35,7 @@ import LecturerContactAdmin from "./pages/lecturer/ContactAdmin";
 import Classes from "./pages/lecturer/Classes";
 import ClassesDetails from "./pages/lecturer/classes/ClassesDetails";
 import Grades from "./pages/student/Grades";
-import ClassesResources from "./pages/lecturer/classes/ClassesResources";
+import LecturerClassResources from "./pages/lecturer/ClassResources";
 import ClassesGrades from "./pages/lecturer/classes/ClassesGrades";
 import ClassesAssessments from "./pages/lecturer/classes/ClassesAssessments";
 import ClassesChat from "./pages/lecturer/classes/ClassesChat";
@@ -76,7 +76,7 @@ function App() {
               path="/student/Class/:ClassId"
               element={<ClassDetails />}
             >
-              <Route path="resources" element={<ClassResources />} />
+              <Route path="resources" element={<StudentClassResources />} />
               <Route path="notifications" element={<ClassNotifications />} />
               <Route path="assessments" element={<ClassAssessments />} />
               <Route path="chat" element={<ClassChat />} />
@@ -95,7 +95,7 @@ function App() {
             />
             <Route path="/lecturer/classes" element={<Classes />} />
             <Route path="/lecturer/classes/:classId" element={<ClassesDetails />}>
-              <Route path="resources" element={<ClassesResources />} />
+              <Route path="resources" element={<LecturerClassResources />} />
               <Route path="grades" element={<ClassesGrades />} />
               <Route path="assessments" element={<ClassesAssessments />} />
               <Route path="chat" element={<ClassesChat />} />
