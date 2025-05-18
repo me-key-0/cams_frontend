@@ -25,8 +25,7 @@ export default function ClassDetails() {
     return navigation.find((item) => item.href === path)?.href || "resources";
   });
 
-  // TODO: Fetch Class details using ClassId
-  const ClassDetails = {
+  const classDetails = location.state || {
     code: "CS101",
     name: "Introduction to Programming",
     instructor: "Dr. John Smith",
@@ -39,12 +38,12 @@ export default function ClassDetails() {
       <div className="bg-white shadow sm:rounded-lg">
         <div className="px-4 py-5 sm:p-6">
           <h1 className="text-2xl font-bold text-gray-900">
-            {ClassDetails.code}
+            {classDetails.code}
           </h1>
-          <p className="mt-1 text-lg text-gray-500">{ClassDetails.name}</p>
+          <p className="mt-1 text-lg text-gray-500">{classDetails.name}</p>
           <p className="mt-1 text-sm text-gray-500">
-            Instructor: {ClassDetails.instructor} | Credits:{" "}
-            {ClassDetails.credits}
+            Instructor: {classDetails.instructor} | Credits:{" "}
+            {classDetails.credits}
           </p>
         </div>
       </div>

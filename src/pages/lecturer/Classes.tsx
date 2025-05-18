@@ -1,69 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpenIcon,
-  UserGroupIcon,
-  ClockIcon,
   AcademicCapIcon,
+  CalendarIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
+import { assignmentService } from "../../api/services/assignmentService";
+import { Assignment } from "../../types/assignment";
 
-interface Class {
-  id: string;
-  code: string;
-  name: string;
-  instructor: string;
-  credits: number;
-  schedule: string;
-  room: string;
-  status: "Active" | "Completed" | "Upcoming";
-  students: number;
-  yearLevel: string;   
-  semester: string;
-}
-
-// Mock data - replace with actual API calls
-const mockClass: Class[] = [
-  {
-    id: "1",
-    code: "CS101",
-    name: "Introduction to Programming",
-    instructor: "Dr. John Smith",
-    credits: 3,
-    schedule: "Mon, Wed 9:00 AM - 10:30 AM",
-    room: "Room 101",
-    status: "Active",
-    students: 45,
-    yearLevel: "1st Year",      
-    semester: "1st Semester",   
-  },
-  {
-    id: "2",
-    code: "MATH201",
-    name: "Calculus II",
-    instructor: "Prof. Sarah Johnson",
-    credits: 4,
-    schedule: "Tue, Thu 11:00 AM - 12:30 PM",
-    room: "Room 202",
-    status: "Active",
-    students: 38,
-    yearLevel: "1st Year",     
-    semester: "1st Semester",   
-  },
-  {
-    id: "3",
-    code: "PHYS101",
-    name: "Physics I",
-    instructor: "Dr. Michael Brown",
-    credits: 4,
-    schedule: "Mon, Wed 2:00 PM - 3:30 PM",
-    room: "Room 303",
-    status: "Upcoming",
-    students: 42,
-    yearLevel: "1st Year",      
-    semester: "2nd Semester",   
-  },
-];
-// Add year and semester options
 const yearLevels = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
 const semesters = ["1st Semester", "2nd Semester"];
 
@@ -71,21 +15,65 @@ export default function Classes() {
   const [selectedYear, setSelectedYear] = useState(yearLevels[0]);
   const [selectedSemester, setSelectedSemester] = useState(semesters[0]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const filteredClass = mockClass.filter(
-  (Class) =>
-    (Class.yearLevel === selectedYear) &&
-    (Class.semester === selectedSemester) &&
-    (
-      Class.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      Class.code.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-);
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // TODO: Get actual lecturerId from auth context
+        const lecturerId = 101;
+        console.log('Fetching assignments for lecturer:', lecturerId);
+        const response = await assignmentService.getAssignmentSessions(lecturerId);
+        console.log('Received assignments:', response);
+        setAssignments(response || []);
+      } catch (err) {
+        console.error('Error fetching assignments:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred while fetching assignments');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleClassClick = (ClassId: string) => {
-    navigate(`/lecturer/classes/${ClassId}/resources`);
+    fetchAssignments();
+  }, []);
+
+  const filteredAssignments = assignments.filter((assignment) => {
+    if (!searchQuery) return true;
+    return (
+      assignment?.course?.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assignment?.course?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
+
+  console.log('Current state:', { assignments, searchQuery, filtered: filteredAssignments.length });
+
+  const handleAssignmentClick = (assignment: Assignment) => {
+    navigate(`/lecturer/classes/${assignment.course.id}/resources`, {
+      state: {
+        code: assignment.course.code,
+        name: assignment.course.name,
+        credits: assignment.course.creditHour,
+        year: assignment.year,
+        semester: assignment.semester,
+        academicYear: assignment.academicYear,
+        status: assignment.status
+      }
+    });
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -97,30 +85,6 @@ export default function Classes() {
               My Classes
             </h3>
             <div className="flex items-center space-x-4">
-              {/* Year dropdown */}
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                className="min-w-[130px] pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              >
-                {yearLevels.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              {/* Semester dropdown */}
-              <select
-                value={selectedSemester}
-                onChange={(e) => setSelectedSemester(e.target.value)}
-                className="min-w-[150px] ml-2 pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-              >
-                {semesters.map((semester) => (
-                  <option key={semester} value={semester}>
-                    {semester}
-                  </option>
-                ))}
-              </select>
               <input
                 type="text"
                 placeholder="Search classes..."
@@ -133,51 +97,64 @@ export default function Classes() {
         </div>
       </div>
 
-      {/* Class Grid */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <p className="text-red-600">{error}</p>
+        </div>
+      )}
+
+      {/* Classes Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredClass.map((Class) => (
+        {filteredAssignments.map((assignment) => (
           <div
-            key={Class.id}
-            onClick={() => handleClassClick(Class.id)}
+            key={assignment.id}
+            onClick={() => handleAssignmentClick(assignment)}
             className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200 cursor-pointer"
           >
             <div className="px-4 py-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h4 className="text-lg font-medium text-gray-900">
-                    {Class.code}
-                  </h4>
-                  <p className="mt-1 text-sm text-gray-500">{Class.name}</p>
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="bg-gray-50 p-4 rounded-lg w-full">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xl font-semibold text-gray-900">
+                        {assignment.course.code}
+                      </h4>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          assignment.status === "ACTIVE"
+                            ? "bg-green-100 text-green-800"
+                            : assignment.status === "UPCOMING"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {assignment.status}
+                      </span>
+                    </div>
+                    <p className="text-base text-gray-700 font-medium">{assignment.course.name}</p>
+                    <div className="mt-2 flex items-center">
+                      <span className="text-sm text-gray-600 font-medium">Credit Hours:</span>
+                      <span className="ml-2 text-sm text-gray-900">{assignment.course.creditHour}</span>
+                    </div>
+                  </div>
                 </div>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    Class.status === "Active"
-                      ? "bg-green-100 text-green-800"
-                      : Class.status === "Upcoming"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  {Class.status}
-                </span>
-              </div>
 
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center text-sm text-gray-500">
-                  <UserGroupIcon className="h-5 w-5 mr-2" />
-                  {Class.students} Students
-                </div>
-                <div className="flex items-center text-sm text-gray-500">
-                  <ClockIcon className="h-5 w-5 mr-2" />
-                  {Class.schedule}
-                </div>
-                <div className="flex items-center text-sm text-gray-500">
-                  <BookOpenIcon className="h-5 w-5 mr-2" />
-                  {Class.room}
-                </div>
-                <div className="flex items-center text-sm text-gray-500">
-                  <AcademicCapIcon className="h-5 w-5 mr-2" />
-                  {Class.credits} Credits
+                <div className="pt-4 border-t border-gray-200 space-y-2">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <AcademicCapIcon className="h-5 w-5 mr-2" />
+                    Year Level: {assignment.year === 1 ? "1st Year" : 
+                               assignment.year === 2 ? "2nd Year" : 
+                               assignment.year === 3 ? "3rd Year" : 
+                               `${assignment.year}th Year`}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <ClockIcon className="h-5 w-5 mr-2" />
+                    Semester: {assignment.semester === 1 ? "1st Semester" : "2nd Semester"}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <CalendarIcon className="h-5 w-5 mr-2" />
+                    Academic Year: {assignment.academicYear} - {assignment.academicYear + 1}
+                  </div>
                 </div>
               </div>
             </div>
