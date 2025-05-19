@@ -10,11 +10,7 @@ const api = axios.create({
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
-    // 'Access-Control-Allow-Origin': 'http://localhost:5173',
-    // 'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,PATCH,OPTIONS',
-    // 'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
   },
-  // withCredentials: true
 });
 
 // Request interceptor

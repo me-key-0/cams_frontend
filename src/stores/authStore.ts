@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // Store in localStorage
-          localStorage.setItem('auth_token', token);
+          localStorage.setItem('token', token);
           
           set((state) => ({
             token,
@@ -70,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       clearToken: () => {
-        localStorage.removeItem('auth_token');
+        localStorage.removeItem('token');
         set({
           token: null,
           user: null,
@@ -79,7 +79,7 @@ export const useAuthStore = create<AuthState>()(
           error: null
         });
       },      getUserFromToken: () => {
-        const token = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('token');
         if (!token) return null;
         try {
           return jwtDecode<User>(token);
