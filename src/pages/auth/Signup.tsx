@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { SignupCredentials } from "../../types/auth";
-import useAuthStore from "../../stores/authStore";
+import {useAuthStore} from "../../stores/authStore";
 import toast from "react-hot-toast";
 
 export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { signup } = useAuthStore();
+  const { setToken } = useAuthStore();
   const {
     register,
     handleSubmit,
@@ -18,7 +18,7 @@ export default function Signup() {
   const onSubmit = async (data: SignupCredentials) => {
     try {
       setIsLoading(true);
-      await signup(data);
+      // await setToken(data);
       toast.success("Account created successfully!");
       navigate("/student");
     } catch (error) {

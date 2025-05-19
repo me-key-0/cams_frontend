@@ -10,8 +10,6 @@ import {
   ChatBubbleLeftRightIcon,
   Bars3Icon,
   XMarkIcon,
-  FolderIcon,
-  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../stores/authStore";
 
@@ -55,10 +53,10 @@ const lecturerNavigation = [
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, clearToken } = useAuthStore();
 
   const navigation =
-    user?.role === "lecturer" ? lecturerNavigation : studentNavigation;
+    user?.role.toLowerCase() === "lecturer" ? lecturerNavigation : studentNavigation;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -104,7 +102,7 @@ export default function Layout() {
           </nav>
           <div className="border-t border-gray-200 p-4">
             <button
-              onClick={logout}
+              onClick={clearToken}
               className="flex w-full items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
             >
               Logout
@@ -143,7 +141,7 @@ export default function Layout() {
           </nav>
           <div className="border-t border-gray-200 p-4">
             <button
-              onClick={logout}
+              onClick={clearToken}
               className="flex w-full items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
             >
               Logout

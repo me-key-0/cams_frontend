@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import useAuthStore from "../stores/authStore";
+import {useAuthStore} from "../stores/authStore";
 
 export default function Unauthorized() {
   const navigate = useNavigate();

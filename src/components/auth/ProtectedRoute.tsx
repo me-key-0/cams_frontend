@@ -1,28 +1,38 @@
-import { Navigate, Outlet } from "react-router-dom";
-import useAuthStore from "../../stores/authStore";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuthStore } from "../../stores/authStore";
 
 interface ProtectedRouteProps {
   allowedRoles: string[];
+  children?: React.ReactNode;
 }
 
-export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
-  const { user, isAuthenticated } = useAuthStore();
+export default function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
+  const { user, isAuthenticated, error } = useAuthStore();
+  const location = useLocation();
 
-  console.log("ProtectedRoute Debug:", {
-    isAuthenticated,
-    user,
-    allowedRoles,
-    hasAccess: user && allowedRoles.includes(user.role),
-  });
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Handle authentication errors
+  if (error) {
+    console.error('Auth error:', error);
+    return <Navigate to="/error" replace />;
   }
 
-  if (!user || !allowedRoles.includes(user.role)) {
-    console.log("Unauthorized access:", { user, allowedRoles });
+  // Handle unauthenticated users
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Handle unauthorized access
+  console.log(user, allowedRoles);
+  if (!user || !allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase())) {
+    // Redirect to appropriate dashboard based on user's role
+    if (user?.role.toLowerCase() === 'student') {
+      return <Navigate to="/student" replace />;
+    } else if (user?.role.toLowerCase() === 'lecturer') {
+      return <Navigate to="/lecturer" replace />;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 
-  return <Outlet />;
+  // Render children if provided, otherwise use Outlet
+  return children ? <>{children}</> : <Outlet />;
 }

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { LoginCredentials } from "../../types/auth";
-import useAuthStore from "../../stores/authStore";
+import { login } from "../../api/services/authService";
+import { useAuthStore } from "../../stores/authStore";
 import toast from "react-hot-toast";
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { user } = useAuthStore();
   const {
     register,
     handleSubmit,
@@ -18,22 +19,19 @@ export default function Login() {
   const onSubmit = async (data: LoginCredentials) => {
     try {
       setIsLoading(true);
-      // Mock successful login with user data and token
-      const isLecturer = data.email === "lecturer@example.com";
-      login(
-        {
-          id: isLecturer ? "2" : "1",
-          email: data.email,
-          firstName: isLecturer ? "Sarah" : "John",
-          lastName: isLecturer ? "Wilson" : "Doe",
-          role: isLecturer ? "lecturer" : "student",
-        },
-        "mock-token"
-      );
+      await login(data);
+      
+      // Check if user is authenticated
+      if (user?.role === 'lecturer') {
+        navigate('/lecturer');
+      } else {
+        navigate('/student');
+      }
+      
       toast.success("Login successful!");
-      navigate(isLecturer ? "/lecturer" : "/student");
-    } catch (error) {
-      toast.error("Login failed. Please check your credentials.");
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Login failed. Please check your credentials.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

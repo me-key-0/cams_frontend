@@ -50,6 +50,8 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/unauthorized" element={<Unauthorized />} />
+        {/* Catch-all route for unauthorized access */}
+        <Route path="*" element={<ProtectedRoute allowedRoles={['student', 'lecturer']} />} />
 
         {/* Protected Student Routes */}
         <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
