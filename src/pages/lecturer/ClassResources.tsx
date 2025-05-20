@@ -13,9 +13,12 @@ import {
     PhotoIcon,
     LinkIcon
 } from '@heroicons/react/24/outline';
-import { resourceService } from '../../api/services/resourceService';
-import { ResourceMaterial, ResourceType, CreateResourceRequest } from '../../types/resource';
+import resourceService from '../../api/services/resourceService';
+import { ResourceType, ResourceMaterial } from '../../types/resource';
+import type { CreateResourceRequest } from '../../api/services/resourceService';
 import { formatFileSize, formatDate } from '../../utils/formatters';
+import { useAuthStore } from '../../stores/authStore';
+
 
 const PREDEFINED_CATEGORIES = [
     'Lecture Notes',
@@ -36,15 +39,29 @@ export default function LecturerClassResources() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
+    const { user, lecturer } = useAuthStore();
 
     const [formData, setFormData] = useState<CreateResourceRequest>({
         title: '',
         description: '',
         type: ResourceType.DOCUMENT,
         courseSessionId: parseInt(classId!),
-        uploadedBy: parseInt(localStorage.getItem('userId') || '0'),
+        uploadedBy: lecturer?.id || user?.id || 0,
         categories: []
     });
+
+    useEffect(() => {
+        if (user?.role === 'LECTURER' && !lecturer) {
+            useAuthStore.getState().getLecturerId().then((lecturerId) => {
+                if (lecturerId) {
+                    setFormData(prev => ({
+                        ...prev,
+                        uploadedBy: lecturerId
+                    }));
+                }
+            });
+        }
+    }, [user, lecturer]);
 
     useEffect(() => {
         loadResources();
@@ -54,8 +71,8 @@ export default function LecturerClassResources() {
         try {
             setIsLoading(true);
             setError(null);
-            const data = await resourceService.getSessionResources(parseInt(classId!));
-            setResources(data);
+            const data = await resourceService.getResourcesByCourseSession(parseInt(classId!));
+            setResources(data as unknown as ResourceMaterial[]);
         } catch (err) {
             console.error('Failed to load resources:', err);
             setError('Failed to load resources. Please try again later.');
@@ -76,16 +93,16 @@ export default function LecturerClassResources() {
             
             // Auto-detect resource type
             const contentType = file.type;
-            let resourceType = ResourceType.DOCUMENT;
+            let type: ResourceType = ResourceType.DOCUMENT;
             if (contentType.startsWith('image/')) {
-                resourceType = ResourceType.PHOTO;
+                type = ResourceType.PHOTO;
             } else if (contentType.startsWith('video/')) {
-                resourceType = ResourceType.VIDEO;
+                type = ResourceType.VIDEO;
             }
             
             setFormData(prev => ({
                 ...prev,
-                type: resourceType,
+                type,
                 title: file.name.split('.')[0] // Set default title as filename
             }));
         }
@@ -93,20 +110,32 @@ export default function LecturerClassResources() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedFile && formData.type !== ResourceType.LINK) {
-            toast.error('Please select a file to upload');
-            return;
-        }
-
         try {
             setIsUploading(true);
-            setError(null);
-            if (selectedFile) {
-                await resourceService.uploadResource(selectedFile, formData);
-                toast.success('Resource uploaded successfully');
+            setUploadProgress(0);
+            
+            const submissionData = {
+                ...formData,
+                description: formData.description || '',
+                courseSessionId: parseInt(classId!),
+                uploadedBy: lecturer?.id || user?.id || 0
+            } as CreateResourceRequest;
+            
+            if (!selectedFile && formData.type !== ResourceType.LINK) {
+                toast.error('Please select a file to upload');
+                return;
+            }
+
+            if (formData.type === ResourceType.LINK) {
+                const resource = await resourceService.createLinkResource(formData);
+                setResources([...resources, resource as ResourceMaterial]);
+                toast.success('Link resource created successfully');
+            } else {
+                const resource = await resourceService.uploadResource(selectedFile!, formData);
+                setResources([...resources, resource as ResourceMaterial]);
+                toast.success('File resource uploaded successfully');
             }
             
-            // Reset form
             setIsCreating(false);
             setSelectedFile(null);
             setFormData({
@@ -114,19 +143,15 @@ export default function LecturerClassResources() {
                 description: '',
                 type: ResourceType.DOCUMENT,
                 courseSessionId: parseInt(classId!),
-                uploadedBy: parseInt(localStorage.getItem('userId') || '0'),
+                uploadedBy: user?.id || 0,
                 categories: []
             });
-            
-            // Reload resources
-            await loadResources();
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to upload resource:', err);
-            setError(err.response?.data?.details?.message || 'Failed to upload resource');
-            toast.error(err.response?.data?.details?.message || 'Failed to upload resource');
+            setError('Failed to upload resource. Please try again later.');
+            toast.error('Failed to upload resource');
         } finally {
             setIsUploading(false);
-            setUploadProgress(0);
         }
     };
 
@@ -136,19 +161,21 @@ export default function LecturerClassResources() {
         }
 
         try {
-            await resourceService.deleteResource(id);
+            await resourceService.deleteResource(id as number);
             toast.success('Resource deleted successfully');
             setResources(resources.filter(r => r.id !== id));
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to delete resource:', err);
-            toast.error(err.response?.data?.details?.message || 'Failed to delete resource');
+            toast.error('Failed to delete resource');
         }
     };
 
-    const filteredResources = resources.filter(resource => {
-        const matchesCategory = selectedCategory === 'all' || resource.categories.includes(selectedCategory);
+    const filteredResources = resources.filter((resource: ResourceMaterial): boolean => {
+        const matchesCategory = selectedCategory === 'all' || resource.categories.some(category =>
+            category.toLowerCase() === selectedCategory.toLowerCase()
+        );
         const matchesSearch = 
-            resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            resource.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             resource.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             false;
         return matchesCategory && matchesSearch;
@@ -166,6 +193,8 @@ export default function LecturerClassResources() {
                 return <LinkIcon className="h-8 w-8 text-purple-500" />;
             case ResourceType.FOLDER:
                 return <FolderIcon className="h-8 w-8 text-yellow-500" />;
+            default:
+                return null;
         }
     };
 

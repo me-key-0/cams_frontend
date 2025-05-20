@@ -5,13 +5,14 @@ import {
     DocumentIcon,
     VideoCameraIcon,
     PhotoIcon,
-    LinkIcon,
-    FolderIcon,
     ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
-import { resourceService } from '../../api/services/resourceService';
-import { ResourceMaterial, ResourceType } from '../../types/resource';
+import resourceService  from '../../api/services/resourceService';
+import { ResourceType } from '../../types/resource';
+import type { ResourceMaterial } from '../../types/resource';
 import { formatFileSize, formatDate } from '../../utils/formatters';
+
+// Remove unused type definitions
 
 const PREDEFINED_CATEGORIES = [
     'Lecture Notes',
@@ -38,7 +39,7 @@ export default function StudentClassResources() {
         try {
             setIsLoading(true);
             setError(null);
-            const data = await resourceService.getSessionResources(parseInt(ClassId!));
+            const data = await resourceService.getResourcesByCourseSession(parseInt(ClassId!));
             setResources(data);
         } catch (err) {
             console.error('Failed to load resources:', err);
@@ -51,11 +52,33 @@ export default function StudentClassResources() {
 
     const handleDownload = async (resource: ResourceMaterial) => {
         try {
-            // Record download
-            await resourceService.recordDownload(resource.id);
+            // For link resources, open in new tab
+            if (resource.type === 'LINK') {
+                window.open(resource.fileUrl, '_blank');
+                return;
+            }
+
+            // For file resources, use fetch to get the file
+            const response = await fetch(`/api/v1/resources/download/${resource.id}/${resource.fileName}`);
+            if (!response.ok) {
+                throw new Error('Failed to download file');
+            }
+
+            // Create a blob from the response
+            const blob = await response.blob();
             
-            // Open resource in new tab
-            window.open(resource.fileUrl, '_blank');
+            // Create a temporary link to trigger download
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = resource.fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            // Record download count
+            await resourceService.incrementDownloadCount(resource.id);
             
             // Update download count locally
             setResources(resources.map(r => 
@@ -63,33 +86,35 @@ export default function StudentClassResources() {
                     ? { ...r, downloadCount: r.downloadCount + 1 }
                     : r
             ));
+            
+            toast.success('Download started');
         } catch (err) {
-            console.error('Failed to record download:', err);
-            // Still open the resource even if recording fails
-            window.open(resource.fileUrl, '_blank');
+            console.error('Failed to download resource:', err);
+            toast.error('Failed to download resource');
         }
     };
 
     const getResourceIcon = (type: ResourceType) => {
-        switch (type) {
-            case ResourceType.DOCUMENT:
+    if (!type) return null;
+    switch (type) {
+            case 'DOCUMENT':
                 return <DocumentIcon className="h-8 w-8 text-blue-500" />;
-            case ResourceType.VIDEO:
+            case 'VIDEO':
                 return <VideoCameraIcon className="h-8 w-8 text-red-500" />;
-            case ResourceType.PHOTO:
+            case 'PHOTO':
                 return <PhotoIcon className="h-8 w-8 text-green-500" />;
-            case ResourceType.LINK:
-                return <LinkIcon className="h-8 w-8 text-purple-500" />;
-            case ResourceType.FOLDER:
-                return <FolderIcon className="h-8 w-8 text-yellow-500" />;
+            case 'LINK':
+                return null;
         }
     };
 
-    const filteredResources = resources.filter(resource => {
-        const matchesCategory = selectedCategory === 'all' || resource.categories.includes(selectedCategory);
+    const filteredResources = resources.filter((resource: ResourceMaterial): boolean => {
+        const matchesCategory = selectedCategory === 'all' || resource.categories.some(category =>
+            category.toLowerCase() === selectedCategory.toLowerCase()
+        );
         const matchesType = selectedType === 'all' || resource.type === selectedType;
         const matchesSearch = 
-            resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            resource.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             resource.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             false;
         return matchesCategory && matchesType && matchesSearch;

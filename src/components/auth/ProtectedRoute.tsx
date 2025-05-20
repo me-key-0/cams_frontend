@@ -22,7 +22,7 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
   }
 
   // Handle unauthorized access
-  console.log(user, allowedRoles);
+  
   if (!user || !allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase())) {
     // Redirect to appropriate dashboard based on user's role
     if (user?.role.toLowerCase() === 'student') {

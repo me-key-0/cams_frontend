@@ -1,104 +1,109 @@
 import axios from '../config';
-import { ResourceMaterial, CreateResourceRequest } from '../../types/resource';
+import { ResourceType, ResourceStatus } from '../../types/resource';
 
-const RESOURCE_API = '/api/v1/resources';
+export interface CreateResourceRequest {
+  title: string;
+  description?: string;
+  type: ResourceType;
+  courseSessionId: number;
+  uploadedBy: number;
+  categories: string[];
+}
 
-export const resourceService = {
-    // Upload a new resource
-    uploadResource: async (file: File, request: CreateResourceRequest) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        // Append request data
-        Object.entries(request).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                value.forEach(item => formData.append(key, item));
-            } else {
-                formData.append(key, String(value));
-            }
-        });
+export interface Resource {
+  id: number;
+  title: string;
+  description: string;
+  type: ResourceType;
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  courseSessionId: number;
+  uploadedBy: number;
+  categories: string[];
+  status: ResourceStatus;
+  downloadCount: number;
+  uploadedAt: string;
+}
 
-        const response = await axios.post<ResourceMaterial>(
-            RESOURCE_API,
-            formData,
-            {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            }
-        );
-        return response.data;
-    },
+const resourceService = {
+  // File upload for documents, videos, photos
+  uploadResource: async (
+    file: File,
+    data: CreateResourceRequest
+  ): Promise<Resource> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    Object.entries(data).forEach(([key, value]) => {
+      if (key !== 'file') {
+        formData.append(key, value.toString());
+      }
+    });
 
-    // Create a link resource
-    createLinkResource: async (request: CreateResourceRequest) => {
-        const response = await axios.post<ResourceMaterial>(
-            RESOURCE_API,
-            request,
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-        return response.data;
-    },
+    const response = await axios.post(`/api/v1/resources`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 
-    // Get resources for a course session
-    getSessionResources: async (courseSessionId: number) => {
-        const response = await axios.get<ResourceMaterial[]>(
-            `${RESOURCE_API}/course-session/${courseSessionId}`
-        );
-        return response.data;
-    },
+  incrementDownloadCount: async (resourceId: number): Promise<void> => {
+    await axios.post(`/api/v1/resources/${resourceId}/increment-download`);
+  },
 
-    // Get resources by type
-    getResourcesByType: async (courseSessionId: number, type: string) => {
-        const response = await axios.get<ResourceMaterial[]>(
-            `${RESOURCE_API}/course-session/${courseSessionId}/type/${type}`
-        );
-        return response.data;
-    },
+  // Create link resource (no file upload)
+  createLinkResource: async (data: CreateResourceRequest): Promise<Resource> => {
+    const response = await axios.post(`/api/v1/resources`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.data;
+  },
 
-    // Get resources by category
-    getResourcesByCategory: async (courseSessionId: number, category: string) => {
-        const response = await axios.get<ResourceMaterial[]>(
-            `${RESOURCE_API}/course-session/${courseSessionId}/category/${category}`
-        );
-        return response.data;
-    },
+  // Get single resource
+  getResource: async (id: number): Promise<Resource> => {
+    const response = await axios.get(`/api/v1/resources/${id}`);
+    return response.data;
+  },
 
-    // Search resources
-    searchResources: async (courseSessionId: number, searchTerm: string) => {
-        const response = await axios.get<ResourceMaterial[]>(
-            `${RESOURCE_API}/course-session/${courseSessionId}/search?searchTerm=${searchTerm}`
-        );
-        return response.data;
-    },
+  // Get resources by course session
+  getResourcesByCourseSession: async (courseSessionId: number): Promise<Resource[]> => {
+    const response = await axios.get(`/api/v1/resources/course-session/${courseSessionId}`);
+    return response.data;
+  },
 
-    // Update resource
-    updateResource: async (id: number, title: string, description: string, categories: string[]) => {
-        const response = await axios.put<ResourceMaterial>(
-            `${RESOURCE_API}/${id}`,
-            null,
-            {
-                params: {
-                    title,
-                    description,
-                    categories
-                }
-            }
-        );
-        return response.data;
-    },
+  // Get resources by type
+  getResourcesByType: async (courseSessionId: number, type: string): Promise<Resource[]> => {
+    const response = await axios.get(`/api/v1/resources/course-session/${courseSessionId}/type/${type}`);
+    return response.data;
+  },
 
-    // Delete resource
-    deleteResource: async (id: number) => {
-        await axios.delete(`${RESOURCE_API}/${id}`);
-    },
+  // Get resources by category
+  getResourcesByCategory: async (courseSessionId: number, category: string): Promise<Resource[]> => {
+    const response = await axios.get(`/api/v1/resources/course-session/${courseSessionId}/category/${category}`);
+    return response.data;
+  },
 
-    // Record download
-    recordDownload: async (id: number) => {
-        await axios.post(`${RESOURCE_API}/${id}/download`);
-    }
-}; 
+  // Search resources
+  searchResources: async (courseSessionId: number, searchTerm: string): Promise<Resource[]> => {
+    const response = await axios.get(`/api/v1/resources/course-session/${courseSessionId}/search`, {
+      params: { searchTerm },
+    });
+    return response.data;
+  },
+
+  // Update resource
+  updateResource: async (id: number, data: Partial<CreateResourceRequest>): Promise<Resource> => {
+    const response = await axios.put(`/api/v1/resources/${id}`, data);
+    return response.data;
+  },
+
+  // Delete resource
+  deleteResource: async (id: number): Promise<void> => {
+    await axios.delete(`/api/v1/resources/${id}`);
+  },
+};
+
+export default resourceService;
