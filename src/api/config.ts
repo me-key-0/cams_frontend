@@ -22,6 +22,20 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // // Add user role and id headers for announcements
+    // if (config.url?.includes('/announcements')) {
+    //   const user = JSON.parse(localStorage.getItem('user') || '{}');
+    //   if (user.role) {
+    //     config.headers['X-User-Role'] = user.role;
+    //   }
+    //   if (user.id) {
+    //     config.headers['X-User-Id'] = user.id;
+    //   }
+    //   if (user.departmentCode) {
+    //     config.headers['X-User-Department'] = user.departmentCode;
+    //   }
+    // }
+
     // Add API prefix to all requests
     if (config.url && !config.url.startsWith(API_PREFIX)) {
       config.url = `${API_PREFIX}${config.url}`;
