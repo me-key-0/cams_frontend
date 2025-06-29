@@ -41,49 +41,53 @@ export default function ClassChat() {
   const wsManagerRef = useRef<ChatWebSocketManager | null>(null);
 
   // Fetch course lecturers
-  useEffect(() => {
-    const fetchLecturers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+useEffect(() => {
+  const fetchLecturers = async () => {
+    setLoading(true);
+    setError(null);
 
-        if (!ClassId) {
-          setError("Course session ID is required.");
-          return;
-        }
+    if (!ClassId) {
+      setError("Course session ID is required.");
+      setLoading(false);
+      return;
+    }
 
-        // Get course session details to find assigned lecturers
-        const response = await api.get(`/api/course-sessions/${ClassId}`);
-        const courseSession = response.data;
-        
-        if (courseSession.lecturerIds && courseSession.lecturerIds.length > 0) {
-          // Fetch lecturer details for each lecturer ID
-          const lecturerPromises = courseSession.lecturerIds.map(async (lecturerId: number) => {
-            try {
-              const lecturerResponse = await api.get(`/api/users/lecturer/${lecturerId}`);
-              return lecturerResponse.data;
-            } catch (err) {
-              console.error(`Error fetching lecturer ${lecturerId}:`, err);
-              return null;
-            }
-          });
+    try {
+      // Get course session details to find assigned lecturers
+      const response = await api.get<number[]>(`/api/session/${ClassId}/lecturers`);
+      const lecturerIds = response.data;
 
-          const lecturerResults = await Promise.all(lecturerPromises);
-          const validLecturers = lecturerResults.filter(lecturer => lecturer !== null);
-          setLecturers(validLecturers);
-        } else {
-          setLecturers([]);
-        }
-      } catch (err: any) {
-        console.error('Error fetching lecturers:', err);
-        setError("Failed to load course lecturers. Please try again later.");
-      } finally {
-        setLoading(false);
+      if (Array.isArray(lecturerIds) && lecturerIds.length > 0) {
+        const lecturerPromises = lecturerIds.map(async (lecturerId) => {
+          try {
+            const lecturerResponse = await api.get(`/api/users/lecturer/${lecturerId}`);
+            return lecturerResponse.data;
+          } catch (err) {
+            console.error(`Error fetching lecturer ${lecturerId}:`, err);
+            return null;
+          }
+        });
+
+        const lecturerResults = await Promise.all(lecturerPromises);
+        const validLecturers = lecturerResults.filter(
+          (lecturer): lecturer is NonNullable<typeof lecturer> => lecturer !== null
+        );
+        setLecturers(validLecturers);
+      } else {
+        setLecturers([]);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch lecturer IDs:", error);
+      setError("Unable to load lecturers. Please try again later.");
+      setLecturers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchLecturers();
-  }, [ClassId]);
+  fetchLecturers();
+}, [ClassId]);
+
 
   // Initialize WebSocket connection
   useEffect(() => {
