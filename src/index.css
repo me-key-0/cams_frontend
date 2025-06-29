@@ -158,19 +158,6 @@
     @apply py-12 md:py-16 lg:py-20;
   }
 
-  /* Animation utilities */
-  .animate-in {
-    @apply animate-fade-in;
-  }
-
-  .animate-slide-in {
-    @apply animate-slide-in;
-  }
-
-  .animate-scale-in {
-    @apply animate-scale-in;
-  }
-
   /* Status indicators */
   .status-success {
     @apply bg-success-50 text-success-700 border-success-200;
