@@ -1,285 +1,349 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useOutletContext } from "react-router-dom";
 import {
   PlusIcon,
   TrashIcon,
   PencilIcon,
   CheckIcon,
   XMarkIcon,
+  AcademicCapIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
+import { useAuthStore } from "../../../stores/authStore";
+import api from "../../../api/config";
 
-interface EvaluationField {
-  id: string;
+interface GradeType {
+  id: number;
   name: string;
-  type: "mid" | "final" | "assignment" | "project";
-  percentage: number;
+  description: string;
   maxScore: number;
+  weightPercentage: number;
+  category: "QUIZ" | "ASSIGNMENT" | "MIDTERM" | "FINAL" | "PROJECT";
+  courseSessionId: number;
 }
 
-interface StudentGrade {
+interface Student {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
   studentId: string;
-  name: string;
-  grades: {
-    [key: string]: {
-      score: number;
-      submittedAt: string;
-      feedback?: string;
-    };
-  };
 }
 
-// Mock data - replace with actual API calls
-const mockEvaluationFields: EvaluationField[] = [
-  {
-    id: "1",
-    name: "Midterm Exam",
-    type: "mid",
-    percentage: 30,
-    maxScore: 100,
-  },
-  {
-    id: "2",
-    name: "Final Exam",
-    type: "final",
-    percentage: 40,
-    maxScore: 100,
-  },
-  {
-    id: "3",
-    name: "Programming Assignment 1",
-    type: "assignment",
-    percentage: 15,
-    maxScore: 100,
-  },
-  {
-    id: "4",
-    name: "Final Project",
-    type: "project",
-    percentage: 15,
-    maxScore: 100,
-  },
-];
+interface Grade {
+  id: number;
+  studentId: number;
+  gradeTypeId: number;
+  score: number;
+  feedback?: string;
+  gradedAt: string;
+}
 
-const mockStudents: StudentGrade[] = [
-  {
-    studentId: "1",
-    name: "John Doe",
-    grades: {
-      "1": { score: 85, submittedAt: "2024-03-15T10:30:00" },
-      "2": { score: 90, submittedAt: "2024-03-20T14:15:00" },
-      "3": { score: 95, submittedAt: "2024-03-10T09:45:00" },
-      "4": { score: 88, submittedAt: "2024-03-25T16:20:00" },
-    },
-  },
-  {
-    studentId: "2",
-    name: "Jane Smith",
-    grades: {
-      "1": { score: 92, submittedAt: "2024-03-15T11:15:00" },
-      "2": { score: 88, submittedAt: "2024-03-20T15:30:00" },
-      "3": { score: 90, submittedAt: "2024-03-10T10:20:00" },
-      "4": { score: 95, submittedAt: "2024-03-25T17:00:00" },
-    },
-  },
-];
+interface GradebookEntry {
+  student: Student;
+  grades: { [gradeTypeId: number]: Grade };
+  totalGrade: number;
+  letterGrade: string;
+}
 
-export default function LecturerGrades() {
-  const [evaluationFields, setEvaluationFields] =
-    useState<EvaluationField[]>(mockEvaluationFields);
-  const [students, setStudents] = useState<StudentGrade[]>(mockStudents);
-  const [isAddingField, setIsAddingField] = useState(false);
-  const [newField, setNewField] = useState<Partial<EvaluationField>>({
-    name: "",
-    type: "assignment",
-    percentage: 0,
-    maxScore: 100,
-  });
-  const [editingField, setEditingField] = useState<string | null>(null);
+export default function LecturerClassesGrades() {
+  const { classId } = useParams();
+  const { classDetails } = useOutletContext<{ classDetails: any }>();
+  const { lecturer } = useAuthStore();
+  
+  const [gradeTypes, setGradeTypes] = useState<GradeType[]>([]);
+  const [gradebook, setGradebook] = useState<GradebookEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isAddingGradeType, setIsAddingGradeType] = useState(false);
   const [editingGrade, setEditingGrade] = useState<{
-    studentId: string;
-    fieldId: string;
-    grade: number;
+    studentId: number;
+    gradeTypeId: number;
+    score: number;
+    feedback: string;
   } | null>(null);
+  
+  const [newGradeType, setNewGradeType] = useState({
+    name: "",
+    description: "",
+    maxScore: 100,
+    weightPercentage: 0,
+    category: "ASSIGNMENT" as GradeType["category"],
+  });
 
-  const calculateTotalGrade = (student: StudentGrade) => {
-    let total = 0;
-    let totalPercentage = 0;
+  useEffect(() => {
+    const fetchGradingData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    evaluationFields.forEach((field) => {
-      const grade = student.grades[field.id];
-      if (grade) {
-        total += (grade.score / field.maxScore) * field.percentage;
-        totalPercentage += field.percentage;
+        if (!classId) {
+          setError("Course session ID is required.");
+          return;
+        }
+
+        // Fetch grade types for this course session
+        const gradeTypesResponse = await api.get(`/api/grades/grading/grade-types/course-session/${classId}`);
+        const gradeTypesData = gradeTypesResponse.data || [];
+        setGradeTypes(gradeTypesData);
+
+        // Fetch gradebook data
+        const gradebookResponse = await api.get(`/api/grades/grading/gradebook/course-session/${classId}`);
+        const gradebookData = gradebookResponse.data || [];
+        setGradebook(gradebookData);
+
+      } catch (err: any) {
+        console.error('Error fetching grading data:', err);
+        if (err.response?.status === 404) {
+          setError("No grading data found for this course session.");
+        } else {
+          setError("Failed to load grading data. Please try again later.");
+        }
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    return totalPercentage > 0 ? (total / totalPercentage) * 100 : 0;
-  };
+    fetchGradingData();
+  }, [classId]);
 
-  const handleAddField = (e: React.FormEvent) => {
+  const handleCreateGradeType = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      newField.name &&
-      newField.type &&
-      newField.percentage &&
-      newField.maxScore
-    ) {
-      const field: EvaluationField = {
-        id: Date.now().toString(),
-        name: newField.name,
-        type: newField.type as EvaluationField["type"],
-        percentage: newField.percentage,
-        maxScore: newField.maxScore,
+    try {
+      const gradeTypeData = {
+        ...newGradeType,
+        courseSessionId: parseInt(classId!),
       };
-      setEvaluationFields([...evaluationFields, field]);
-      setIsAddingField(false);
-      setNewField({
+
+      const response = await api.post('/api/grades/grading/grade-types', gradeTypeData);
+      setGradeTypes([...gradeTypes, response.data]);
+      setIsAddingGradeType(false);
+      setNewGradeType({
         name: "",
-        type: "assignment",
-        percentage: 0,
+        description: "",
         maxScore: 100,
+        weightPercentage: 0,
+        category: "ASSIGNMENT",
       });
+    } catch (err) {
+      console.error('Error creating grade type:', err);
+      setError('Failed to create grade type.');
     }
   };
 
-  const handleDeleteField = (id: string) => {
-    setEvaluationFields(evaluationFields.filter((f) => f.id !== id));
+  const handleCreateDefaultGradeTypes = async () => {
+    try {
+      await api.post(`/api/grades/grading/grade-types/course-session/${classId}/defaults`);
+      // Refresh grade types
+      const response = await api.get(`/api/grades/grading/grade-types/course-session/${classId}`);
+      setGradeTypes(response.data || []);
+    } catch (err) {
+      console.error('Error creating default grade types:', err);
+      setError('Failed to create default grade types.');
+    }
   };
 
-  const handleUpdateGrade = (
-    studentId: string,
-    fieldId: string,
-    grade: number
-  ) => {
-    setStudents(
-      students.map((student) => {
-        if (student.studentId === studentId) {
+  const handleUpdateGrade = async () => {
+    if (!editingGrade) return;
+
+    try {
+      const gradeData = {
+        studentId: editingGrade.studentId,
+        gradeTypeId: editingGrade.gradeTypeId,
+        score: editingGrade.score,
+        feedback: editingGrade.feedback,
+      };
+
+      await api.post('/api/grades/grading/grades', gradeData);
+      
+      // Update local gradebook
+      setGradebook(gradebook.map(entry => {
+        if (entry.student.id === editingGrade.studentId) {
+          const updatedGrades = {
+            ...entry.grades,
+            [editingGrade.gradeTypeId]: {
+              id: entry.grades[editingGrade.gradeTypeId]?.id || 0,
+              studentId: editingGrade.studentId,
+              gradeTypeId: editingGrade.gradeTypeId,
+              score: editingGrade.score,
+              feedback: editingGrade.feedback,
+              gradedAt: new Date().toISOString(),
+            }
+          };
+          
+          // Recalculate total grade
+          const totalGrade = calculateTotalGrade(updatedGrades);
+          
           return {
-            ...student,
-            grades: {
-              ...student.grades,
-              [fieldId]: {
-                ...student.grades[fieldId],
-                score: grade,
-                submittedAt: new Date().toISOString(),
-              },
-            },
+            ...entry,
+            grades: updatedGrades,
+            totalGrade,
+            letterGrade: calculateLetterGrade(totalGrade),
           };
         }
-        return student;
-      })
-    );
-    setEditingGrade(null);
+        return entry;
+      }));
+      
+      setEditingGrade(null);
+    } catch (err) {
+      console.error('Error updating grade:', err);
+      setError('Failed to update grade.');
+    }
   };
+
+  const calculateTotalGrade = (grades: { [gradeTypeId: number]: Grade }): number => {
+    let totalPoints = 0;
+    let totalWeight = 0;
+
+    gradeTypes.forEach(gradeType => {
+      const grade = grades[gradeType.id];
+      if (grade) {
+        const percentage = (grade.score / gradeType.maxScore) * 100;
+        totalPoints += percentage * (gradeType.weightPercentage / 100);
+        totalWeight += gradeType.weightPercentage;
+      }
+    });
+
+    return totalWeight > 0 ? (totalPoints / totalWeight) * 100 : 0;
+  };
+
+  const calculateLetterGrade = (totalGrade: number): string => {
+    if (totalGrade >= 90) return "A+";
+    if (totalGrade >= 85) return "A";
+    if (totalGrade >= 80) return "A-";
+    if (totalGrade >= 75) return "B+";
+    if (totalGrade >= 70) return "B";
+    if (totalGrade >= 65) return "B-";
+    if (totalGrade >= 60) return "C+";
+    if (totalGrade >= 55) return "C";
+    if (totalGrade >= 50) return "C-";
+    if (totalGrade >= 45) return "D+";
+    if (totalGrade >= 40) return "D";
+    return "F";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Student Grades</h2>
-        <button
-          onClick={() => setIsAddingField(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-        >
-          <PlusIcon className="h-5 w-5 mr-2" />
-          Add Evaluation Field
-        </button>
+        <div>
+          <h2 className="heading-3 flex items-center">
+            <AcademicCapIcon className="h-6 w-6 mr-2 text-primary-500" />
+            Student Grades
+          </h2>
+          <p className="body-default text-foreground-secondary mt-1">
+            Manage grades and assessments for {classDetails?.code}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {gradeTypes.length === 0 && (
+            <button
+              onClick={handleCreateDefaultGradeTypes}
+              className="btn btn-secondary"
+            >
+              Create Default Grade Types
+            </button>
+          )}
+          <button
+            onClick={() => setIsAddingGradeType(true)}
+            className="btn btn-primary"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Grade Type
+          </button>
+        </div>
       </div>
 
-      {/* Add Evaluation Field Form */}
-      {isAddingField && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Add New Evaluation Field
-          </h3>
-          <form onSubmit={handleAddField} className="space-y-4">
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={newField.name}
-                onChange={(e) =>
-                  setNewField({ ...newField, name: e.target.value })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                required
-              />
-            </div>
+      {error && (
+        <div className="status-error p-4 rounded-lg">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+            <p className="body-default">{error}</p>
+          </div>
+        </div>
+      )}
 
-            <div>
-              <label
-                htmlFor="type"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Type
-              </label>
-              <select
-                id="type"
-                value={newField.type}
-                onChange={(e) =>
-                  setNewField({
-                    ...newField,
-                    type: e.target.value as EvaluationField["type"],
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              >
-                <option value="mid">Midterm</option>
-                <option value="final">Final</option>
-                <option value="assignment">Assignment</option>
-                <option value="project">Project</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+      {/* Add Grade Type Form */}
+      {isAddingGradeType && (
+        <div className="card">
+          <h3 className="heading-4 mb-4">Add New Grade Type</h3>
+          <form onSubmit={handleCreateGradeType} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label
-                  htmlFor="percentage"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Percentage
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Name
                 </label>
                 <input
-                  type="number"
-                  id="percentage"
-                  min="0"
-                  max="100"
-                  value={newField.percentage}
-                  onChange={(e) =>
-                    setNewField({
-                      ...newField,
-                      percentage: Number(e.target.value),
-                    })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  type="text"
+                  value={newGradeType.name}
+                  onChange={(e) => setNewGradeType({ ...newGradeType, name: e.target.value })}
+                  className="input"
                   required
                 />
               </div>
-
               <div>
-                <label
-                  htmlFor="maxScore"
-                  className="block text-sm font-medium text-gray-700"
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Category
+                </label>
+                <select
+                  value={newGradeType.category}
+                  onChange={(e) => setNewGradeType({ ...newGradeType, category: e.target.value as GradeType["category"] })}
+                  className="input"
                 >
+                  <option value="QUIZ">Quiz</option>
+                  <option value="ASSIGNMENT">Assignment</option>
+                  <option value="MIDTERM">Midterm</option>
+                  <option value="FINAL">Final</option>
+                  <option value="PROJECT">Project</option>
+                </select>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Description
+              </label>
+              <textarea
+                value={newGradeType.description}
+                onChange={(e) => setNewGradeType({ ...newGradeType, description: e.target.value })}
+                className="input"
+                rows={3}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
                   Maximum Score
                 </label>
                 <input
                   type="number"
-                  id="maxScore"
+                  value={newGradeType.maxScore}
+                  onChange={(e) => setNewGradeType({ ...newGradeType, maxScore: Number(e.target.value) })}
+                  className="input"
                   min="0"
-                  value={newField.maxScore}
-                  onChange={(e) =>
-                    setNewField({
-                      ...newField,
-                      maxScore: Number(e.target.value),
-                    })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Weight Percentage
+                </label>
+                <input
+                  type="number"
+                  value={newGradeType.weightPercentage}
+                  onChange={(e) => setNewGradeType({ ...newGradeType, weightPercentage: Number(e.target.value) })}
+                  className="input"
+                  min="0"
+                  max="100"
                   required
                 />
               </div>
@@ -288,16 +352,13 @@ export default function LecturerGrades() {
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setIsAddingField(false)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                onClick={() => setIsAddingGradeType(false)}
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                Add Field
+              <button type="submit" className="btn btn-primary">
+                Create Grade Type
               </button>
             </div>
           </form>
@@ -305,119 +366,143 @@ export default function LecturerGrades() {
       )}
 
       {/* Grades Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                Student
-              </th>
-              {evaluationFields.map((field) => (
-                <th
-                  key={field.id}
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{field.name}</span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => setEditingField(field.id)}
-                        className="text-gray-400 hover:text-gray-500"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteField(field.id)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </th>
-              ))}
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                Total Grade
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {students.map((student) => (
-              <tr key={student.studentId}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {student.name}
-                </td>
-                {evaluationFields.map((field) => (
-                  <td
-                    key={field.id}
-                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                  >
-                    {editingGrade?.studentId === student.studentId &&
-                    editingGrade?.fieldId === field.id ? (
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max={field.maxScore}
-                          value={editingGrade.grade}
-                          onChange={(e) =>
-                            setEditingGrade({
-                              ...editingGrade,
-                              grade: Number(e.target.value),
-                            })
-                          }
-                          className="w-20 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                        />
-                        <button
-                          onClick={() =>
-                            handleUpdateGrade(
-                              student.studentId,
-                              field.id,
-                              editingGrade.grade
-                            )
-                          }
-                          className="text-green-600 hover:text-green-900"
-                        >
-                          <CheckIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setEditingGrade(null)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <XMarkIcon className="h-4 w-4" />
-                        </button>
+      {gradeTypes.length > 0 ? (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-background-secondary">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                    Student
+                  </th>
+                  {gradeTypes.map((gradeType) => (
+                    <th
+                      key={gradeType.id}
+                      className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div>{gradeType.name}</div>
+                          <div className="text-xs text-foreground-tertiary">
+                            {gradeType.weightPercentage}% • Max: {gradeType.maxScore}
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      <div
-                        className="cursor-pointer"
-                        onClick={() =>
-                          setEditingGrade({
-                            studentId: student.studentId,
-                            fieldId: field.id,
-                            grade: student.grades[field.id]?.score || 0,
-                          })
-                        }
-                      >
-                        {student.grades[field.id]?.score || "-"}
+                    </th>
+                  ))}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                    Total Grade
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-background divide-y divide-border">
+                {gradebook.map((entry) => (
+                  <tr key={entry.student.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-foreground">
+                          {entry.student.firstName} {entry.student.lastName}
+                        </div>
+                        <div className="text-sm text-foreground-secondary">
+                          ID: {entry.student.studentId}
+                        </div>
                       </div>
-                    )}
-                  </td>
+                    </td>
+                    {gradeTypes.map((gradeType) => (
+                      <td key={gradeType.id} className="px-6 py-4 whitespace-nowrap">
+                        {editingGrade?.studentId === entry.student.id &&
+                        editingGrade?.gradeTypeId === gradeType.id ? (
+                          <div className="space-y-2">
+                            <input
+                              type="number"
+                              value={editingGrade.score}
+                              onChange={(e) =>
+                                setEditingGrade({
+                                  ...editingGrade,
+                                  score: Number(e.target.value),
+                                })
+                              }
+                              className="w-20 input text-sm"
+                              min="0"
+                              max={gradeType.maxScore}
+                            />
+                            <input
+                              type="text"
+                              value={editingGrade.feedback}
+                              onChange={(e) =>
+                                setEditingGrade({
+                                  ...editingGrade,
+                                  feedback: e.target.value,
+                                })
+                              }
+                              className="w-full input text-sm"
+                              placeholder="Feedback (optional)"
+                            />
+                            <div className="flex space-x-1">
+                              <button
+                                onClick={handleUpdateGrade}
+                                className="p-1 text-success-600 hover:text-success-700"
+                              >
+                                <CheckIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingGrade(null)}
+                                className="p-1 text-error-600 hover:text-error-700"
+                              >
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer hover:bg-background-secondary p-2 rounded"
+                            onClick={() =>
+                              setEditingGrade({
+                                studentId: entry.student.id,
+                                gradeTypeId: gradeType.id,
+                                score: entry.grades[gradeType.id]?.score || 0,
+                                feedback: entry.grades[gradeType.id]?.feedback || "",
+                              })
+                            }
+                          >
+                            <div className="text-sm font-medium">
+                              {entry.grades[gradeType.id]?.score || "-"} / {gradeType.maxScore}
+                            </div>
+                            {entry.grades[gradeType.id]?.feedback && (
+                              <div className="text-xs text-foreground-secondary">
+                                {entry.grades[gradeType.id].feedback}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    ))}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-foreground">
+                        {entry.totalGrade.toFixed(1)}% ({entry.letterGrade})
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {calculateTotalGrade(student).toFixed(1)}%
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="card text-center py-12">
+          <AcademicCapIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+          <h3 className="heading-4 mb-2">No Grade Types Found</h3>
+          <p className="body-default text-foreground-secondary mb-4">
+            Create grade types to start managing student grades.
+          </p>
+          <button
+            onClick={handleCreateDefaultGradeTypes}
+            className="btn btn-primary"
+          >
+            Create Default Grade Types
+          </button>
+        </div>
+      )}
     </div>
   );
 }
