@@ -3,290 +3,476 @@ import {
   PaperAirplaneIcon,
   UserCircleIcon,
   MagnifyingGlassIcon,
+  ChatBubbleLeftRightIcon,
+  CheckIcon,
+  ClockIcon,
+  PaperClipIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-
-interface Message {
-  id: string;
-  senderId: string;
-  senderName: string;
-  content: string;
-  timestamp: string;
-  isRead: boolean;
-}
-
-interface ChatUser {
-  id: string;
-  name: string;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  unreadCount: number;
-  avatar?: string;
-}
-
-// Mock data - replace with actual API calls
-const mockUsers: ChatUser[] = [
-  {
-    id: "1",
-    name: "John Doe",
-    lastMessage: "Could you clarify the assignment requirements?",
-    lastMessageTime: "2024-03-15T10:30:00",
-    unreadCount: 2,
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    lastMessage: "Thank you for the feedback on my submission.",
-    lastMessageTime: "2024-03-15T09:15:00",
-    unreadCount: 0,
-  },
-  {
-    id: "3",
-    name: "Mike Johnson",
-    lastMessage: "When is the next class?",
-    lastMessageTime: "2024-03-14T16:45:00",
-    unreadCount: 1,
-  },
-];
-
-const mockMessages: { [key: string]: Message[] } = {
-  "1": [
-    {
-      id: "1",
-      senderId: "1",
-      senderName: "John Doe",
-      content: "Could you clarify the assignment requirements?",
-      timestamp: "2024-03-15T10:30:00",
-      isRead: false,
-    },
-    {
-      id: "2",
-      senderId: "lecturer",
-      senderName: "Dr. Sarah Wilson",
-      content: "Of Class! What specific part would you like me to explain?",
-      timestamp: "2024-03-15T10:35:00",
-      isRead: true,
-    },
-  ],
-  "2": [
-    {
-      id: "3",
-      senderId: "2",
-      senderName: "Jane Smith",
-      content: "Thank you for the feedback on my submission.",
-      timestamp: "2024-03-15T09:15:00",
-      isRead: true,
-    },
-  ],
-  "3": [
-    {
-      id: "4",
-      senderId: "3",
-      senderName: "Mike Johnson",
-      content: "When is the next class?",
-      timestamp: "2024-03-14T16:45:00",
-      isRead: false,
-    },
-  ],
-};
+import { useAuthStore } from "../../stores/authStore";
+import { chatService, ChatRoom, ChatMessage, ChatWebSocketManager } from "../../api/services/chatService";
 
 export default function LecturerChat() {
-  const [users, setUsers] = useState<ChatUser[]>(mockUsers);
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { user, lecturer } = useAuthStore();
+  
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsManagerRef = useRef<ChatWebSocketManager | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Fetch chat rooms
   useEffect(() => {
-    if (selectedUser) {
-      setMessages(mockMessages[selectedUser] || []);
+    const fetchChatRooms = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const rooms = await chatService.getUserRooms();
+        setChatRooms(rooms);
+      } catch (err: any) {
+        console.error('Error fetching chat rooms:', err);
+        setError("Failed to load chat rooms. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user && lecturer) {
+      fetchChatRooms();
     }
-  }, [selectedUser]);
+  }, [user, lecturer]);
 
+  // Initialize WebSocket connection
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (user && lecturer && selectedRoom) {
+      const wsManager = new ChatWebSocketManager(
+        lecturer.id,
+        `${lecturer.firstName} ${lecturer.lastName}`,
+        'LECTURER',
+        selectedRoom.roomId
+      );
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim() && selectedUser) {
-      const message: Message = {
-        id: Date.now().toString(),
-        senderId: "lecturer",
-        senderName: "Dr. Sarah Wilson",
-        content: newMessage,
-        timestamp: new Date().toISOString(),
-        isRead: true,
+      wsManager.onConnectionChange(setIsConnected);
+      wsManager.onMessage((message) => {
+        if (message.type === 'SEND_MESSAGE' && message.roomId === selectedRoom.roomId) {
+          setMessages(prev => [...prev, message.data]);
+          scrollToBottom();
+        }
+      });
+
+      wsManager.connect();
+      wsManagerRef.current = wsManager;
+
+      return () => {
+        wsManager.disconnect();
+        wsManagerRef.current = null;
       };
+    }
+  }, [user, lecturer, selectedRoom]);
 
-      setMessages([...messages, message]);
-      setNewMessage("");
+  // Handle room selection
+  const handleRoomSelect = async (room: ChatRoom) => {
+    try {
+      setSelectedRoom(room);
+      setError(null);
 
-      // Update user's last message and unread count
-      setUsers(
-        users.map((user) =>
-          user.id === selectedUser
-            ? {
-                ...user,
-                lastMessage: newMessage,
-                lastMessageTime: new Date().toISOString(),
-                unreadCount: 0,
-              }
-            : user
+      // Load chat history
+      const history = await chatService.getChatHistory(room.roomId);
+      setMessages(history.reverse()); // Reverse to show oldest first
+
+      // Mark messages as read
+      await chatService.markMessagesAsRead(room.roomId);
+
+      // Update room unread count
+      setChatRooms(rooms => 
+        rooms.map(r => 
+          r.roomId === room.roomId 
+            ? { ...r, unreadCount: 0 }
+            : r
         )
       );
+
+      scrollToBottom();
+    } catch (err: any) {
+      console.error('Error selecting room:', err);
+      setError("Failed to load chat. Please try again.");
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if ((!newMessage.trim() && !selectedFile) || !selectedRoom || !user) return;
+
+    try {
+      setSendingMessage(true);
+      setError(null);
+
+      let messageContent = newMessage.trim();
+      let messageType: 'TEXT' | 'FILE' = 'TEXT';
+
+      // Handle file upload if present
+      if (selectedFile) {
+        messageContent = selectedFile.name;
+        messageType = 'FILE';
+      }
+
+      // Send via API
+      const sentMessage = await chatService.sendMessage({
+        roomId: selectedRoom.roomId,
+        content: messageContent,
+        messageType
+      });
+
+      // Send via WebSocket for real-time delivery
+      if (wsManagerRef.current && isConnected) {
+        wsManagerRef.current.sendMessage({
+          type: 'SEND_MESSAGE',
+          roomId: selectedRoom.roomId,
+          content: messageContent,
+          messageType
+        });
+      }
+
+      // Add to local messages
+      setMessages(prev => [...prev, sentMessage]);
+      
+      // Update room's last message
+      setChatRooms(rooms => 
+        rooms.map(room => 
+          room.roomId === selectedRoom.roomId 
+            ? { 
+                ...room, 
+                lastMessage: messageContent,
+                lastMessageTime: new Date().toISOString()
+              }
+            : room
+        )
+      );
+      
+      // Clear form
+      setNewMessage("");
+      setSelectedFile(null);
+      
+      scrollToBottom();
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError("File size must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  };
+
+  const filteredRooms = chatRooms.filter(room =>
+    room.studentName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      {/* Users List */}
-      <div className="w-1/3 border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
+    <div className="flex h-[calc(100vh-8rem)] bg-background rounded-lg overflow-hidden border border-border">
+      {/* Chat Rooms Sidebar */}
+      <div className="w-80 border-r border-border bg-background-secondary flex flex-col">
+        <div className="p-4 border-b border-border">
+          <h3 className="heading-4 mb-3">Student Conversations</h3>
+          
+          {/* Search */}
           <div className="relative">
             <input
               type="text"
-              placeholder="Search students..."
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="input pl-10 text-sm"
             />
-            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
+            <MagnifyingGlassIcon className="h-4 w-4 text-foreground-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {filteredUsers.map((user) => (
-            <button
-              key={user.id}
-              onClick={() => setSelectedUser(user.id)}
-              className={`w-full p-4 flex items-center space-x-3 hover:bg-gray-50 ${
-                selectedUser === user.id ? "bg-gray-50" : ""
-              }`}
-            >
-              {user.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="h-10 w-10 rounded-full"
-                />
-              ) : (
-                <UserCircleIcon className="h-10 w-10 text-gray-400" />
-              )}
-              <div className="flex-1 text-left">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user.name}
-                  </p>
-                  {user.unreadCount > 0 && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                      {user.unreadCount}
-                    </span>
-                  )}
+          {error && (
+            <div className="p-4">
+              <div className="status-error p-3 rounded-lg">
+                <div className="flex items-center">
+                  <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
+                  <p className="body-small">{error}</p>
                 </div>
-                {user.lastMessage && (
-                  <p className="text-sm text-gray-500 truncate">
-                    {user.lastMessage}
-                  </p>
-                )}
-                {user.lastMessageTime && (
-                  <p className="text-xs text-gray-400">
-                    {new Date(user.lastMessageTime).toLocaleString()}
-                  </p>
-                )}
               </div>
-            </button>
-          ))}
+            </div>
+          )}
+
+          {filteredRooms.length === 0 ? (
+            <div className="p-4 text-center">
+              <ChatBubbleLeftRightIcon className="h-12 w-12 text-foreground-tertiary mx-auto mb-3" />
+              <p className="body-small text-foreground-secondary">
+                {searchQuery ? "No conversations match your search" : "No student conversations yet"}
+              </p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {filteredRooms.map((room) => (
+                <button
+                  key={room.roomId}
+                  onClick={() => handleRoomSelect(room)}
+                  className={`
+                    w-full p-3 rounded-lg text-left transition-all duration-200 mb-2
+                    ${selectedRoom?.roomId === room.roomId
+                      ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800'
+                      : 'hover:bg-background-tertiary'
+                    }
+                  `}
+                >
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mr-3">
+                      <span className="body-small font-medium text-primary-700 dark:text-primary-300">
+                        {room.studentName.split(' ').map(n => n[0]).join('')}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="body-default font-medium text-foreground truncate">
+                          {room.studentName}
+                        </p>
+                        {room.unreadCount > 0 && (
+                          <span className="bg-primary-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            {room.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      {room.lastMessage && (
+                        <p className="body-small text-foreground-secondary truncate">
+                          {room.lastMessage}
+                        </p>
+                      )}
+                      {room.lastMessageTime && (
+                        <p className="body-small text-foreground-tertiary">
+                          {formatMessageTime(room.lastMessageTime)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Connection Status */}
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center">
+            <div className={`h-2 w-2 rounded-full mr-2 ${isConnected ? 'bg-success-500' : 'bg-error-500'}`}></div>
+            <span className="body-small text-foreground-secondary">
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {selectedUser ? (
+        {selectedRoom ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                {users.find((u) => u.id === selectedUser)?.avatar ? (
-                  <img
-                    src={users.find((u) => u.id === selectedUser)?.avatar}
-                    alt={users.find((u) => u.id === selectedUser)?.name}
-                    className="h-10 w-10 rounded-full"
-                  />
-                ) : (
-                  <UserCircleIcon className="h-10 w-10 text-gray-400" />
-                )}
+            <div className="p-4 border-b border-border bg-background">
+              <div className="flex items-center">
+                <div className="h-10 w-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mr-3">
+                  <span className="body-small font-medium text-primary-700 dark:text-primary-300">
+                    {selectedRoom.studentName.split(' ').map(n => n[0]).join('')}
+                  </span>
+                </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900">
-                    {users.find((u) => u.id === selectedUser)?.name}
+                  <h3 className="body-default font-medium text-foreground">
+                    {selectedRoom.studentName}
                   </h3>
-                  <p className="text-xs text-gray-500">Online</p>
+                  <p className="body-small text-foreground-secondary">
+                    Course Session ID: {selectedRoom.courseSessionId}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.senderId === "lecturer"
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                      message.senderId === "lecturer"
-                        ? "bg-primary-600 text-white"
-                        : "bg-gray-100 text-gray-900"
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs mt-1 opacity-75">
-                      {new Date(message.timestamp).toLocaleString()}
-                    </p>
-                  </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background-secondary">
+              {messages.length === 0 ? (
+                <div className="text-center py-8">
+                  <ChatBubbleLeftRightIcon className="h-12 w-12 text-foreground-tertiary mx-auto mb-3" />
+                  <p className="body-default text-foreground-secondary">
+                    Start a conversation with {selectedRoom.studentName}
+                  </p>
                 </div>
-              ))}
+              ) : (
+                messages.map((message) => {
+                  const isOwnMessage = message.senderId === lecturer?.id;
+                  
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`
+                          max-w-[70%] rounded-lg px-4 py-3 shadow-soft
+                          ${isOwnMessage
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-background border border-border'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`body-small font-medium ${isOwnMessage ? 'text-primary-100' : 'text-foreground'}`}>
+                            {message.senderName}
+                          </span>
+                          <span className={`body-small ${isOwnMessage ? 'text-primary-200' : 'text-foreground-tertiary'}`}>
+                            {formatMessageTime(message.timestamp)}
+                          </span>
+                        </div>
+                        
+                        <p className={`body-default ${isOwnMessage ? 'text-white' : 'text-foreground'}`}>
+                          {message.content}
+                        </p>
+                        
+                        {message.messageType === 'FILE' && (
+                          <div className="mt-2 flex items-center">
+                            <PaperClipIcon className={`h-4 w-4 mr-1 ${isOwnMessage ? 'text-primary-200' : 'text-foreground-secondary'}`} />
+                            <span className={`body-small ${isOwnMessage ? 'text-primary-200' : 'text-foreground-secondary'}`}>
+                              File attachment
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-end mt-1">
+                          {isOwnMessage && (
+                            <CheckIcon className="h-3 w-3 text-primary-200" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
-            <form
-              onSubmit={handleSendMessage}
-              className="p-4 border-t border-gray-200"
-            >
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-                >
-                  <PaperAirplaneIcon className="h-5 w-5" />
-                </button>
-              </div>
-            </form>
+            <div className="p-4 border-t border-border bg-background">
+              <form onSubmit={handleSendMessage} className="space-y-3">
+                {selectedFile && (
+                  <div className="flex items-center justify-between p-3 bg-background-secondary rounded-lg">
+                    <div className="flex items-center">
+                      <PaperClipIcon className="h-4 w-4 mr-2 text-foreground-secondary" />
+                      <span className="body-small text-foreground">{selectedFile.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFile(null)}
+                      className="text-foreground-secondary hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                
+                <div className="flex items-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="p-2 text-foreground-secondary hover:text-foreground hover:bg-background-secondary rounded-lg transition-colors"
+                  >
+                    <PaperClipIcon className="h-5 w-5" />
+                  </button>
+                  
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                  />
+                  
+                  <div className="flex-1">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="input resize-none"
+                      rows={1}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={(!newMessage.trim() && !selectedFile) || sendingMessage}
+                    className="btn btn-primary p-3"
+                  >
+                    {sendingMessage ? (
+                      <ClockIcon className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <PaperAirplaneIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            Select a student to start chatting
+          <div className="flex-1 flex items-center justify-center bg-background-secondary">
+            <div className="text-center">
+              <ChatBubbleLeftRightIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+              <h3 className="heading-4 mb-2">Select a Conversation</h3>
+              <p className="body-default text-foreground-secondary">
+                Choose a student conversation from the sidebar to start chatting
+              </p>
+            </div>
           </div>
         )}
       </div>

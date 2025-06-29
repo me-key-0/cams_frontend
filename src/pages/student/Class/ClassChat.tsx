@@ -1,468 +1,479 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useOutletContext } from "react-router-dom";
 import {
   PaperAirplaneIcon,
   PaperClipIcon,
-  FaceSmileIcon,
-  EllipsisHorizontalIcon,
-  UserGroupIcon,
+  UserCircleIcon,
+  ExclamationTriangleIcon,
+  ChatBubbleLeftRightIcon,
+  CheckIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
+import { useAuthStore } from "../../../stores/authStore";
+import { chatService, ChatRoom, ChatMessage, ChatWebSocketManager } from "../../../api/services/chatService";
+import api from "../../../api/config";
 
-interface Message {
-  id: string;
-  sender: {
-    id: string;
-    name: string;
-    avatar: string;
-    isOnline: boolean;
-    role: "student" | "lecturer";
-  };
-  content: string;
-  timestamp: string;
-  attachments?: {
-    name: string;
-    url: string;
-    type: string;
-  }[];
-  reactions?: {
-    emoji: string;
-    count: number;
-    users: string[];
-  }[];
+interface Lecturer {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department: string;
 }
-
-interface ChatUser {
-  id: string;
-  name: string;
-  avatar: string;
-  isOnline: boolean;
-  lastSeen?: string;
-  role: "student" | "lecturer";
-}
-
-// Mock data - replace with actual API calls
-const mockClass: { [key: string]: { name: string; lecturers: ChatUser[] } } =
-  {
-    "1": {
-      name: "Introduction to Programming",
-      lecturers: [
-        {
-          id: "lecturer1",
-          name: "Dr. Sarah Wilson",
-          avatar: "https://ui-avatars.com/api/?name=Sarah+Wilson",
-          isOnline: true,
-          role: "lecturer",
-        },
-        {
-          id: "lecturer2",
-          name: "Prof. James Brown",
-          avatar: "https://ui-avatars.com/api/?name=James+Brown",
-          isOnline: false,
-          lastSeen: "1 hour ago",
-          role: "lecturer",
-        },
-      ],
-    },
-    "2": {
-      name: "Data Structures and Algorithms",
-      lecturers: [
-        {
-          id: "lecturer3",
-          name: "Dr. Emily Chen",
-          avatar: "https://ui-avatars.com/api/?name=Emily+Chen",
-          isOnline: true,
-          role: "lecturer",
-        },
-        {
-          id: "lecturer4",
-          name: "Prof. Michael Lee",
-          avatar: "https://ui-avatars.com/api/?name=Michael+Lee",
-          isOnline: true,
-          role: "lecturer",
-        },
-      ],
-    },
-  };
-
-const mockMessages: { [key: string]: { [key: string]: Message[] } } = {
-  "1": {
-    lecturer1: [
-      {
-        id: "1",
-        sender: {
-          id: "lecturer1",
-          name: "Dr. Sarah Wilson",
-          avatar: "https://ui-avatars.com/api/?name=Sarah+Wilson",
-          isOnline: true,
-          role: "lecturer",
-        },
-        content:
-          "Hi! I received your assignment submission. Would you like to discuss any specific part?",
-        timestamp: "10:30 AM",
-      },
-      {
-        id: "2",
-        sender: {
-          id: "current-user",
-          name: "You",
-          avatar: "https://ui-avatars.com/api/?name=You",
-          isOnline: true,
-          role: "student",
-        },
-        content: "Yes, I had some questions about the recursion part.",
-        timestamp: "10:31 AM",
-      },
-    ],
-    lecturer2: [
-      {
-        id: "1",
-        sender: {
-          id: "lecturer2",
-          name: "Prof. James Brown",
-          avatar: "https://ui-avatars.com/api/?name=James+Brown",
-          isOnline: false,
-          role: "lecturer",
-        },
-        content:
-          "I've reviewed your project proposal. It looks good overall, but we should discuss the implementation timeline.",
-        timestamp: "2:30 PM",
-      },
-    ],
-  },
-  "2": {
-    lecturer3: [
-      {
-        id: "1",
-        sender: {
-          id: "lecturer3",
-          name: "Dr. Emily Chen",
-          avatar: "https://ui-avatars.com/api/?name=Emily+Chen",
-          isOnline: true,
-          role: "lecturer",
-        },
-        content:
-          "Great work on the binary tree implementation! Would you like to explore more advanced data structures?",
-        timestamp: "11:30 AM",
-      },
-    ],
-    lecturer4: [
-      {
-        id: "1",
-        sender: {
-          id: "lecturer4",
-          name: "Prof. Michael Lee",
-          avatar: "https://ui-avatars.com/api/?name=Michael+Lee",
-          isOnline: true,
-          role: "lecturer",
-        },
-        content:
-          "I've graded your midterm exam. Would you like to review it together?",
-        timestamp: "3:45 PM",
-      },
-    ],
-  },
-};
 
 export default function ClassChat() {
   const { ClassId } = useParams();
-  const [selectedLecturer, setSelectedLecturer] = useState<ChatUser | null>(
-    null
-  );
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { classDetails } = useOutletContext<{ classDetails: any }>();
+  const { user } = useAuthStore();
+  
+  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [selectedLecturer, setSelectedLecturer] = useState<Lecturer | null>(null);
+  const [currentRoom, setCurrentRoom] = useState<ChatRoom | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsManagerRef = useRef<ChatWebSocketManager | null>(null);
 
-  // Update messages when ClassId or selectedLecturer changes
+  // Fetch course lecturers
   useEffect(() => {
-    if (ClassId && selectedLecturer) {
-      setMessages(mockMessages[ClassId]?.[selectedLecturer.id] || []);
-    } else {
-      setMessages([]);
-    }
-  }, [ClassId, selectedLecturer]);
+    const fetchLecturers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+        if (!ClassId) {
+          setError("Course session ID is required.");
+          return;
+        }
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+        // Get course session details to find assigned lecturers
+        const response = await api.get(`/api/course-sessions/${ClassId}`);
+        const courseSession = response.data;
+        
+        if (courseSession.lecturerIds && courseSession.lecturerIds.length > 0) {
+          // Fetch lecturer details for each lecturer ID
+          const lecturerPromises = courseSession.lecturerIds.map(async (lecturerId: number) => {
+            try {
+              const lecturerResponse = await api.get(`/api/users/lecturer/${lecturerId}`);
+              return lecturerResponse.data;
+            } catch (err) {
+              console.error(`Error fetching lecturer ${lecturerId}:`, err);
+              return null;
+            }
+          });
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() && !selectedFile) return;
-
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      sender: {
-        id: "current-user",
-        name: "You",
-        avatar: "https://ui-avatars.com/api/?name=You",
-        isOnline: true,
-        role: "student",
-      },
-      content: newMessage,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      attachments: selectedFile
-        ? [
-            {
-              name: selectedFile.name,
-              url: URL.createObjectURL(selectedFile),
-              type: selectedFile.type,
-            },
-          ]
-        : undefined,
+          const lecturerResults = await Promise.all(lecturerPromises);
+          const validLecturers = lecturerResults.filter(lecturer => lecturer !== null);
+          setLecturers(validLecturers);
+        } else {
+          setLecturers([]);
+        }
+      } catch (err: any) {
+        console.error('Error fetching lecturers:', err);
+        setError("Failed to load course lecturers. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    setMessages([...messages, newMsg]);
-    setNewMessage("");
-    setSelectedFile(null);
+    fetchLecturers();
+  }, [ClassId]);
+
+  // Initialize WebSocket connection
+  useEffect(() => {
+    if (user && currentRoom) {
+      const wsManager = new ChatWebSocketManager(
+        parseInt(user.id.toString()),
+        `${user.firstName} ${user.lastName}`,
+        'STUDENT',
+        currentRoom.roomId
+      );
+
+      wsManager.onConnectionChange(setIsConnected);
+      wsManager.onMessage((message) => {
+        if (message.type === 'SEND_MESSAGE' && message.roomId === currentRoom.roomId) {
+          setMessages(prev => [...prev, message.data]);
+          scrollToBottom();
+        }
+      });
+
+      wsManager.connect();
+      wsManagerRef.current = wsManager;
+
+      return () => {
+        wsManager.disconnect();
+        wsManagerRef.current = null;
+      };
+    }
+  }, [user, currentRoom]);
+
+  // Handle lecturer selection and room creation
+  const handleLecturerSelect = async (lecturer: Lecturer) => {
+    try {
+      setSelectedLecturer(lecturer);
+      setError(null);
+
+      if (!user || !ClassId) {
+        setError("Missing required information to start chat.");
+        return;
+      }
+
+      // Create or get existing chat room
+      const room = await chatService.createOrGetRoom({
+        courseSessionId: parseInt(ClassId),
+        studentId: parseInt(user.id.toString()),
+        studentName: `${user.firstName} ${user.lastName}`,
+        lecturerId: lecturer.id,
+        lecturerName: `${lecturer.firstName} ${lecturer.lastName}`
+      });
+
+      setCurrentRoom(room);
+
+      // Load chat history
+      const history = await chatService.getChatHistory(room.roomId);
+      setMessages(history.reverse()); // Reverse to show oldest first
+
+      // Mark messages as read
+      await chatService.markMessagesAsRead(room.roomId);
+
+      scrollToBottom();
+    } catch (err: any) {
+      console.error('Error selecting lecturer:', err);
+      setError("Failed to start chat. Please try again.");
+    }
+  };
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if ((!newMessage.trim() && !selectedFile) || !currentRoom || !user) return;
+
+    try {
+      setSendingMessage(true);
+      setError(null);
+
+      let messageContent = newMessage.trim();
+      let messageType: 'TEXT' | 'FILE' = 'TEXT';
+
+      // Handle file upload if present
+      if (selectedFile) {
+        // For now, we'll just include the file name in the message
+        // In a real implementation, you'd upload the file first
+        messageContent = selectedFile.name;
+        messageType = 'FILE';
+      }
+
+      // Send via API
+      const sentMessage = await chatService.sendMessage({
+        roomId: currentRoom.roomId,
+        content: messageContent,
+        messageType
+      });
+
+      // Send via WebSocket for real-time delivery
+      if (wsManagerRef.current && isConnected) {
+        wsManagerRef.current.sendMessage({
+          type: 'SEND_MESSAGE',
+          roomId: currentRoom.roomId,
+          content: messageContent,
+          messageType
+        });
+      }
+
+      // Add to local messages
+      setMessages(prev => [...prev, sentMessage]);
+      
+      // Clear form
+      setNewMessage("");
+      setSelectedFile(null);
+      
+      scrollToBottom();
+    } catch (err: any) {
+      console.error('Error sending message:', err);
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError("File size must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
-  const handleReaction = (messageId: string, emoji: string) => {
-    setMessages(
-      messages.map((msg) => {
-        if (msg.id === messageId) {
-          const existingReaction = msg.reactions?.find(
-            (r) => r.emoji === emoji
-          );
-          if (existingReaction) {
-            return {
-              ...msg,
-              reactions: msg.reactions?.map((r) =>
-                r.emoji === emoji
-                  ? {
-                      ...r,
-                      count: r.count + 1,
-                      users: [...r.users, "current-user"],
-                    }
-                  : r
-              ),
-            };
-          }
-          return {
-            ...msg,
-            reactions: [
-              ...(msg.reactions || []),
-              { emoji, count: 1, users: ["current-user"] },
-            ],
-          };
-        }
-        return msg;
-      })
-    );
+  const formatMessageTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
   };
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <div className="flex h-[calc(100vh-16rem)] bg-background rounded-lg overflow-hidden border border-border">
       {/* Lecturers Sidebar */}
-      <div className="w-64 border-r border-gray-200 bg-white">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">
-            {mockClass[ClassId || "1"]?.name || "Class Chat"}
-          </h2>
+      <div className="w-80 border-r border-border bg-background-secondary flex flex-col">
+        <div className="p-4 border-b border-border">
+          <h3 className="heading-4 mb-2">Course Lecturers</h3>
+          <p className="body-small text-foreground-secondary">
+            {classDetails?.code} - {classDetails?.name}
+          </p>
         </div>
-        <div className="overflow-y-auto h-full">
-          {mockClass[ClassId || "1"]?.lecturers.map((lecturer) => (
-            <div
-              key={lecturer.id}
-              onClick={() => setSelectedLecturer(lecturer)}
-              className={`flex items-center p-4 hover:bg-gray-50 cursor-pointer ${
-                selectedLecturer?.id === lecturer.id ? "bg-gray-50" : ""
-              }`}
-            >
-              <div className="relative">
-                <img
-                  src={lecturer.avatar}
-                  alt={lecturer.name}
-                  className="w-10 h-10 rounded-full"
-                />
-                {lecturer.isOnline && (
-                  <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-green-400 ring-2 ring-white" />
-                )}
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {lecturer.name}
-                </p>
-                <p className="text-xs text-gray-500">Class Lecturer</p>
-                {!lecturer.isOnline && lecturer.lastSeen && (
-                  <p className="text-xs text-gray-500">{lecturer.lastSeen}</p>
-                )}
+
+        <div className="flex-1 overflow-y-auto">
+          {error && (
+            <div className="p-4">
+              <div className="status-error p-3 rounded-lg">
+                <div className="flex items-center">
+                  <ExclamationTriangleIcon className="h-4 w-4 mr-2" />
+                  <p className="body-small">{error}</p>
+                </div>
               </div>
             </div>
-          ))}
+          )}
+
+          {lecturers.length === 0 ? (
+            <div className="p-4 text-center">
+              <UserCircleIcon className="h-12 w-12 text-foreground-tertiary mx-auto mb-3" />
+              <p className="body-small text-foreground-secondary">
+                No lecturers assigned to this course
+              </p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {lecturers.map((lecturer) => (
+                <button
+                  key={lecturer.id}
+                  onClick={() => handleLecturerSelect(lecturer)}
+                  className={`
+                    w-full p-3 rounded-lg text-left transition-all duration-200 mb-2
+                    ${selectedLecturer?.id === lecturer.id
+                      ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800'
+                      : 'hover:bg-background-tertiary'
+                    }
+                  `}
+                >
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mr-3">
+                      <span className="body-small font-medium text-primary-700 dark:text-primary-300">
+                        {lecturer.firstName[0]}{lecturer.lastName[0]}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="body-default font-medium text-foreground truncate">
+                        {lecturer.firstName} {lecturer.lastName}
+                      </p>
+                      <p className="body-small text-foreground-secondary truncate">
+                        {lecturer.department}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Connection Status */}
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center">
+            <div className={`h-2 w-2 rounded-full mr-2 ${isConnected ? 'bg-success-500' : 'bg-error-500'}`}></div>
+            <span className="body-small text-foreground-secondary">
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50">
-        {selectedLecturer ? (
+      <div className="flex-1 flex flex-col">
+        {selectedLecturer && currentRoom ? (
           <>
             {/* Chat Header */}
-            <div className="border-b border-gray-200 bg-white p-4">
+            <div className="p-4 border-b border-border bg-background">
               <div className="flex items-center">
-                <img
-                  src={selectedLecturer.avatar}
-                  alt={selectedLecturer.name}
-                  className="w-10 h-10 rounded-full"
-                />
-                <div className="ml-3">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    {selectedLecturer.name}
+                <div className="h-10 w-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mr-3">
+                  <span className="body-small font-medium text-primary-700 dark:text-primary-300">
+                    {selectedLecturer.firstName[0]}{selectedLecturer.lastName[0]}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="body-default font-medium text-foreground">
+                    {selectedLecturer.firstName} {selectedLecturer.lastName}
                   </h3>
-                  <p className="text-sm text-gray-500">Class Lecturer</p>
+                  <p className="body-small text-foreground-secondary">
+                    {selectedLecturer.department}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${
-                    message.sender.id === "current-user"
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-lg p-3 ${
-                      message.sender.id === "current-user"
-                        ? "bg-primary-500 text-white"
-                        : "bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center mb-1">
-                      <img
-                        src={message.sender.avatar}
-                        alt={message.sender.name}
-                        className="w-6 h-6 rounded-full mr-2"
-                      />
-                      <span className="text-sm font-medium">
-                        {message.sender.name}
-                      </span>
-                      <span className="text-xs ml-2 opacity-75">
-                        {message.timestamp}
-                      </span>
-                    </div>
-                    <p className="text-sm">{message.content}</p>
-                    {message.attachments && (
-                      <div className="mt-2">
-                        {message.attachments.map((attachment, index) => (
-                          <a
-                            key={index}
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm underline flex items-center"
-                          >
-                            <PaperClipIcon className="w-4 h-4 mr-1" />
-                            {attachment.name}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                    {message.reactions && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {message.reactions.map((reaction, index) => (
-                          <button
-                            key={index}
-                            onClick={() =>
-                              handleReaction(message.id, reaction.emoji)
-                            }
-                            className="text-xs bg-white bg-opacity-20 rounded-full px-2 py-1 flex items-center"
-                          >
-                            <span className="mr-1">{reaction.emoji}</span>
-                            <span>{reaction.count}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background-secondary">
+              {messages.length === 0 ? (
+                <div className="text-center py-8">
+                  <ChatBubbleLeftRightIcon className="h-12 w-12 text-foreground-tertiary mx-auto mb-3" />
+                  <p className="body-default text-foreground-secondary">
+                    Start a conversation with {selectedLecturer.firstName}
+                  </p>
                 </div>
-              ))}
+              ) : (
+                messages.map((message) => {
+                  const isOwnMessage = message.senderId === parseInt(user?.id?.toString() || '0');
+                  
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`
+                          max-w-[70%] rounded-lg px-4 py-3 shadow-soft
+                          ${isOwnMessage
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-background border border-border'
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`body-small font-medium ${isOwnMessage ? 'text-primary-100' : 'text-foreground'}`}>
+                            {message.senderName}
+                          </span>
+                          <span className={`body-small ${isOwnMessage ? 'text-primary-200' : 'text-foreground-tertiary'}`}>
+                            {formatMessageTime(message.timestamp)}
+                          </span>
+                        </div>
+                        
+                        <p className={`body-default ${isOwnMessage ? 'text-white' : 'text-foreground'}`}>
+                          {message.content}
+                        </p>
+                        
+                        {message.messageType === 'FILE' && (
+                          <div className="mt-2 flex items-center">
+                            <PaperClipIcon className={`h-4 w-4 mr-1 ${isOwnMessage ? 'text-primary-200' : 'text-foreground-secondary'}`} />
+                            <span className={`body-small ${isOwnMessage ? 'text-primary-200' : 'text-foreground-secondary'}`}>
+                              File attachment
+                            </span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-end mt-1">
+                          {isOwnMessage && (
+                            <CheckIcon className="h-3 w-3 text-primary-200" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
               <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
-            <div className="border-t border-gray-200 bg-white p-4">
-              <form
-                onSubmit={handleSendMessage}
-                className="flex items-center space-x-4"
-              >
-                <button
-                  type="button"
-                  className="text-gray-400 hover:text-gray-500"
-                  onClick={() =>
-                    document.getElementById("file-upload")?.click()
-                  }
-                >
-                  <PaperClipIcon className="h-5 w-5" />
-                </button>
-                <input
-                  type="file"
-                  id="file-upload"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <button
-                  type="button"
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <FaceSmileIcon className="h-5 w-5" />
-                </button>
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-full border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
+            <div className="p-4 border-t border-border bg-background">
+              <form onSubmit={handleSendMessage} className="space-y-3">
                 {selectedFile && (
-                  <div className="flex items-center text-sm text-gray-500">
-                    <PaperClipIcon className="h-4 w-4 mr-1" />
-                    {selectedFile.name}
+                  <div className="flex items-center justify-between p-3 bg-background-secondary rounded-lg">
+                    <div className="flex items-center">
+                      <PaperClipIcon className="h-4 w-4 mr-2 text-foreground-secondary" />
+                      <span className="body-small text-foreground">{selectedFile.name}</span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setSelectedFile(null)}
-                      className="ml-2 text-gray-400 hover:text-gray-500"
+                      className="text-foreground-secondary hover:text-foreground"
                     >
                       ×
                     </button>
                   </div>
                 )}
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim() && !selectedFile}
-                  className="bg-primary-500 text-white rounded-full p-2 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <PaperAirplaneIcon className="h-5 w-5" />
-                </button>
+                
+                <div className="flex items-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="p-2 text-foreground-secondary hover:text-foreground hover:bg-background-secondary rounded-lg transition-colors"
+                  >
+                    <PaperClipIcon className="h-5 w-5" />
+                  </button>
+                  
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                  />
+                  
+                  <div className="flex-1">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="input resize-none"
+                      rows={1}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                      }}
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={(!newMessage.trim() && !selectedFile) || sendingMessage}
+                    className="btn btn-primary p-3"
+                  >
+                    {sendingMessage ? (
+                      <ClockIcon className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <PaperAirplaneIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center bg-background-secondary">
             <div className="text-center">
-              <UserGroupIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Select a Lecturer
-              </h3>
-              <p className="text-sm text-gray-500">
-                Choose a lecturer to start a conversation
+              <ChatBubbleLeftRightIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+              <h3 className="heading-4 mb-2">Select a Lecturer</h3>
+              <p className="body-default text-foreground-secondary">
+                Choose a lecturer from the sidebar to start a conversation
               </p>
             </div>
           </div>
