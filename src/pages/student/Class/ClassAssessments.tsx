@@ -1,225 +1,369 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useOutletContext } from "react-router-dom";
 import {
   ClipboardDocumentListIcon,
   DocumentIcon,
   ClockIcon,
   AcademicCapIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
+  PaperClipIcon,
 } from "@heroicons/react/24/outline";
+import { useAuthStore } from "../../../stores/authStore";
+import api from "../../../api/config";
 
 interface Assessment {
-  id: string;
+  id: number;
   title: string;
-  type: "assignment" | "project" | "quiz" | "exam";
   description: string;
+  type: "INDIVIDUAL" | "GROUP";
   dueDate: string;
-  attachments?: {
-    name: string;
-    url: string;
-    type: string;
-  }[];
-  status: "pending" | "submitted" | "graded";
-  grade?: {
-    score: number;
-    maxScore: number;
+  createdAt: string;
+  maxScore: number;
+  status: "DRAFT" | "PUBLISHED";
+  lecturerName: string;
+  attachments: Array<{
+    id: number;
+    title: string;
+    fileName: string;
+    downloadUrl: string;
+  }>;
+  submissionCount: number;
+  isOverdue: boolean;
+  mySubmission?: {
+    id: number;
+    content: string;
+    submittedAt: string;
+    status: "SUBMITTED" | "GRADED";
+    score?: number;
     feedback?: string;
+    isLate: boolean;
+    attachments: Array<{
+      id: number;
+      title: string;
+      fileName: string;
+      downloadUrl: string;
+    }>;
   };
 }
 
-// Mock data - replace with actual API calls
-const mockAssessments: Assessment[] = [
-  {
-    id: "1",
-    title: "Programming Assignment 2",
-    type: "assignment",
-    description:
-      "Implement a binary search tree with the following operations: insert, delete, search, and inorder traversal.",
-    dueDate: "2024-04-05",
-    attachments: [
-      {
-        name: "Assignment2.pdf",
-        url: "/mock-url/assignment2.pdf",
-        type: "pdf",
-      },
-    ],
-    status: "pending",
+interface AssessmentOverview {
+  courseSessionId: number;
+  courseCode: string;
+  courseName: string;
+  assessments: Assessment[];
+  totalAssessments: number;
+  completedAssessments: number;
+  pendingAssessments: number;
+  overallGrade: number;
+  overallLetterGrade: string;
+}
+
+const statusConfig = {
+  pending: {
+    color: "text-warning-600",
+    bgColor: "bg-warning-50 dark:bg-warning-900/20",
+    borderColor: "border-warning-200 dark:border-warning-800",
+    icon: ClockIcon
   },
-  {
-    id: "2",
-    title: "Group Project: Web Application",
-    type: "project",
-    description:
-      "Develop a full-stack web application using React and Node.js. The application should include user authentication, database integration, and RESTful API endpoints.",
-    dueDate: "2024-04-15",
-    attachments: [
-      {
-        name: "ProjectGuidelines.pdf",
-        url: "/mock-url/project.pdf",
-        type: "pdf",
-      },
-    ],
-    status: "submitted",
-    grade: {
-      score: 85,
-      maxScore: 100,
-      feedback:
-        "Good work! Consider adding more error handling and documentation.",
-    },
+  submitted: {
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+    borderColor: "border-blue-200 dark:border-blue-800",
+    icon: CheckCircleIcon
   },
-  {
-    id: "3",
-    title: "Quiz 3: Data Structures",
-    type: "quiz",
-    description:
-      "Multiple choice questions covering arrays, linked lists, and stacks.",
-    dueDate: "2024-03-30",
-    status: "graded",
-    grade: {
-      score: 18,
-      maxScore: 20,
-      feedback:
-        "Excellent performance! You have a strong understanding of the concepts.",
-    },
+  graded: {
+    color: "text-success-600",
+    bgColor: "bg-success-50 dark:bg-success-900/20",
+    borderColor: "border-success-200 dark:border-success-800",
+    icon: CheckCircleIcon
   },
-  {
-    id: "4",
-    title: "Midterm Exam",
-    type: "exam",
-    description: "Covers chapters 1-5 of the course textbook.",
-    dueDate: "2024-03-15",
-    status: "graded",
-    grade: {
-      score: 85,
-      maxScore: 100,
-      feedback: "Good work! Consider reviewing chapter 3 for the final exam.",
-    },
-  },
-  {
-    id: "5",
-    title: "Final Exam",
-    type: "exam",
-    description: "Covers all chapters of the course textbook.",
-    dueDate: "2024-05-20",
-    status: "pending",
-  },
-];
+  overdue: {
+    color: "text-error-600",
+    bgColor: "bg-error-50 dark:bg-error-900/20",
+    borderColor: "border-error-200 dark:border-error-800",
+    icon: ExclamationTriangleIcon
+  }
+};
 
 export default function ClassAssessments() {
   const { ClassId } = useParams();
-  const [assessments] = useState(mockAssessments);
+  const { classDetails } = useOutletContext<{ classDetails: any }>();
+  const { user } = useAuthStore();
+  const [assessmentOverview, setAssessmentOverview] = useState<AssessmentOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const getStatusColor = (status: Assessment["status"]) => {
-    switch (status) {
-      case "pending":
-        return "text-yellow-600 bg-yellow-100";
-      case "submitted":
-        return "text-blue-600 bg-blue-100";
-      case "graded":
-        return "text-green-600 bg-green-100";
-      default:
-        return "text-gray-600 bg-gray-100";
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch student's assessment overview for this course session
+        const response = await api.get(`/api/grades/grading/my-assessments/course-session/${ClassId}`);
+        setAssessmentOverview(response.data);
+      } catch (err: any) {
+        console.error('Error fetching assessments:', err);
+        setError("Failed to load assessments. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (ClassId && user?.id) {
+      fetchAssessments();
+    }
+  }, [ClassId, user?.id]);
+
+  const getAssessmentStatus = (assessment: Assessment) => {
+    if (assessment.isOverdue && !assessment.mySubmission) {
+      return 'overdue';
+    }
+    if (assessment.mySubmission?.status === 'GRADED') {
+      return 'graded';
+    }
+    if (assessment.mySubmission?.status === 'SUBMITTED') {
+      return 'submitted';
+    }
+    return 'pending';
+  };
+
+  const handleDownloadAttachment = async (downloadUrl: string, fileName: string) => {
+    try {
+      const response = await fetch(downloadUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading attachment:', err);
     }
   };
 
-  const calculateTotalGrade = () => {
-    return assessments.reduce((total, assessment) => {
-      if (assessment.grade) {
-        const gradePercentage =
-          (assessment.grade.score / assessment.grade.maxScore) * 100;
-        return total + gradePercentage;
-      }
-      return total;
-    }, 0);
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="status-error p-4 rounded-lg">
+        <div className="flex items-center">
+          <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+          <p className="body-default">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!assessmentOverview) {
+    return (
+      <div className="card text-center py-12">
+        <ClipboardDocumentListIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+        <h3 className="heading-4 mb-2">No Assessments Found</h3>
+        <p className="body-default text-foreground-secondary">
+          No assessments have been published for this course yet.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Grade Summary */}
-      <div className="bg-white shadow sm:rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center">
-            <AcademicCapIcon className="h-8 w-8 text-primary-500 mr-3" />
-            <div>
-              <h2 className="text-lg font-medium text-gray-900">
-                Grade Summary
-              </h2>
-              <p className="mt-1 text-3xl font-semibold text-primary-600">
-                {calculateTotalGrade().toFixed(1)}%
-              </p>
-            </div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="heading-3 flex items-center">
+            <ClipboardDocumentListIcon className="h-6 w-6 mr-2 text-primary-500" />
+            Class Assessments
+          </h2>
+          <p className="body-default text-foreground-secondary mt-1">
+            Track your assignments, projects, and grades
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="body-small text-foreground-secondary">Overall Grade</div>
+          <div className="heading-4 text-primary-600">
+            {assessmentOverview.overallGrade.toFixed(1)}% ({assessmentOverview.overallLetterGrade})
           </div>
+        </div>
+      </div>
+
+      {/* Grade Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card text-center">
+          <AcademicCapIcon className="h-8 w-8 text-primary-500 mx-auto mb-2" />
+          <div className="heading-4 text-primary-600">{assessmentOverview.overallGrade.toFixed(1)}%</div>
+          <div className="body-small text-foreground-secondary">Overall Grade</div>
+        </div>
+        
+        <div className="card text-center">
+          <div className="heading-4 text-foreground">{assessmentOverview.totalAssessments}</div>
+          <div className="body-small text-foreground-secondary">Total Assessments</div>
+        </div>
+        
+        <div className="card text-center">
+          <div className="heading-4 text-success-600">{assessmentOverview.completedAssessments}</div>
+          <div className="body-small text-foreground-secondary">Completed</div>
+        </div>
+        
+        <div className="card text-center">
+          <div className="heading-4 text-warning-600">{assessmentOverview.pendingAssessments}</div>
+          <div className="body-small text-foreground-secondary">Pending</div>
         </div>
       </div>
 
       {/* Assessments List */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">
-          Class Assessments
-        </h2>
-        <div className="flex items-center text-sm text-gray-500">
-          <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-          {assessments.length} total
-        </div>
-      </div>
-
       <div className="space-y-4">
-        {assessments.map((assessment) => (
-          <div
-            key={assessment.id}
-            className="bg-white border border-gray-200 rounded-lg p-4"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center">
-                  <h3 className="text-lg font-medium text-gray-900">
-                    {assessment.title}
-                  </h3>
-                  <span
-                    className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                      assessment.status
-                    )}`}
-                  >
-                    {assessment.status}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  {assessment.description}
-                </p>
-                <div className="mt-2 flex items-center text-sm text-gray-500">
-                  <ClockIcon className="h-4 w-4 mr-1" />
-                  Due: {assessment.dueDate}
-                </div>
-              </div>
-              <div className="ml-4">
-                {assessment.attachments && (
-                  <div className="flex items-center text-sm text-gray-500">
-                    <DocumentIcon className="h-4 w-4 mr-1" />
-                    {assessment.attachments.length} attachment
-                    {assessment.attachments.length !== 1 ? "s" : ""}
+        {assessmentOverview.assessments.map((assessment) => {
+          const status = getAssessmentStatus(assessment);
+          const config = statusConfig[status];
+          const IconComponent = config.icon;
+          
+          return (
+            <div key={assessment.id} className="card">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start space-x-4 flex-1">
+                  <div className={`p-3 rounded-lg ${config.bgColor}`}>
+                    <IconComponent className={`h-6 w-6 ${config.color}`} />
                   </div>
-                )}
-              </div>
-            </div>
-
-            {assessment.grade && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Grade: {assessment.grade.score}/
-                      {assessment.grade.maxScore}
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="heading-4">{assessment.title}</h3>
+                      <span className={`
+                        px-3 py-1 rounded-full text-sm font-medium capitalize
+                        ${config.bgColor} ${config.color}
+                      `}>
+                        {status === 'pending' && assessment.isOverdue ? 'Overdue' : status}
+                      </span>
+                    </div>
+                    
+                    <p className="body-default text-foreground-secondary mb-3">
+                      {assessment.description}
                     </p>
-                    {assessment.grade.feedback && (
-                      <p className="mt-1 text-sm text-gray-500">
-                        {assessment.grade.feedback}
-                      </p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                      <div className="flex items-center text-foreground-secondary">
+                        <ClockIcon className="h-4 w-4 mr-2" />
+                        <span className="body-small">
+                          Due: {new Date(assessment.dueDate).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center text-foreground-secondary">
+                        <AcademicCapIcon className="h-4 w-4 mr-2" />
+                        <span className="body-small">Max Score: {assessment.maxScore}</span>
+                      </div>
+                      
+                      <div className="flex items-center text-foreground-secondary">
+                        <DocumentIcon className="h-4 w-4 mr-2" />
+                        <span className="body-small capitalize">{assessment.type.toLowerCase()}</span>
+                      </div>
+                    </div>
+
+                    {/* Attachments */}
+                    {assessment.attachments.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="body-small font-medium text-foreground mb-2">Attachments:</h4>
+                        <div className="space-y-2">
+                          {assessment.attachments.map((attachment) => (
+                            <button
+                              key={attachment.id}
+                              onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
+                              className="flex items-center text-primary-600 hover:text-primary-700 transition-colors"
+                            >
+                              <PaperClipIcon className="h-4 w-4 mr-2" />
+                              <span className="body-small">{attachment.title}</span>
+                              <ArrowDownTrayIcon className="h-4 w-4 ml-2" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submission Info */}
+                    {assessment.mySubmission && (
+                      <div className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
+                        <h4 className="body-default font-medium mb-2">Your Submission</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <span className="body-small text-foreground-secondary">Submitted:</span>
+                            <div className="body-small">
+                              {new Date(assessment.mySubmission.submittedAt).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                              {assessment.mySubmission.isLate && (
+                                <span className="text-warning-600 ml-2">(Late)</span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {assessment.mySubmission.score !== undefined && (
+                            <div>
+                              <span className="body-small text-foreground-secondary">Grade:</span>
+                              <div className="body-default font-medium">
+                                {assessment.mySubmission.score}/{assessment.maxScore}
+                                <span className="text-foreground-secondary ml-2">
+                                  ({((assessment.mySubmission.score / assessment.maxScore) * 100).toFixed(1)}%)
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {assessment.mySubmission.feedback && (
+                          <div>
+                            <span className="body-small text-foreground-secondary">Feedback:</span>
+                            <p className="body-small mt-1">{assessment.mySubmission.feedback}</p>
+                          </div>
+                        )}
+                        
+                        {assessment.mySubmission.attachments.length > 0 && (
+                          <div className="mt-3">
+                            <span className="body-small text-foreground-secondary">Your Files:</span>
+                            <div className="mt-1 space-y-1">
+                              {assessment.mySubmission.attachments.map((attachment) => (
+                                <button
+                                  key={attachment.id}
+                                  onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
+                                  className="flex items-center text-primary-600 hover:text-primary-700 transition-colors"
+                                >
+                                  <PaperClipIcon className="h-3 w-3 mr-1" />
+                                  <span className="body-small">{attachment.title}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

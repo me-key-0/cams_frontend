@@ -1,156 +1,328 @@
-import React, { useState } from 'react';
-import { Box, Typography, Button, FormControl, FormControlLabel, Radio, RadioGroup, Paper, Alert } from '@mui/material';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useOutletContext } from 'react-router-dom';
+import { 
+  ClipboardDocumentCheckIcon, 
+  CheckCircleIcon, 
+  ExclamationTriangleIcon,
+  InformationCircleIcon 
+} from '@heroicons/react/24/outline';
+import { useAuthStore } from '../../../stores/authStore';
+import api from '../../../api/config';
 
 interface EvaluationQuestion {
   id: number;
   question: string;
+  category: {
+    id: number;
+    name: string;
+  };
 }
 
-const evaluationQuestions: EvaluationQuestion[] = [
-  {
-    id: 1,
-    question: "How would you rate the lecturer's teaching effectiveness?"
-  },
-  {
-    id: 2,
-    question: "How well does the lecturer explain complex concepts?"
-  },
-  {
-    id: 3,
-    question: "How would you rate the lecturer's responsiveness to student questions?"
-  },
-  {
-    id: 4,
-    question: "How well does the lecturer organize and structure the course material?"
-  },
-  {
-    id: 5,
-    question: "How would you rate the overall quality of this course?"
-  }
+interface EvaluationCategory {
+  id: number;
+  name: string;
+  description: string;
+}
+
+interface EvaluationSession {
+  id: number;
+  courseSessionId: number;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+  courseCode: string;
+  courseName: string;
+}
+
+interface SubmissionAnswer {
+  questionId: number;
+  answerId: number;
+}
+
+const ratingOptions = [
+  { id: 5, label: "Excellent", value: 5, color: "text-green-600" },
+  { id: 4, label: "Very Good", value: 4, color: "text-blue-600" },
+  { id: 3, label: "Good", value: 3, color: "text-yellow-600" },
+  { id: 2, label: "Fair", value: 2, color: "text-orange-600" },
+  { id: 1, label: "Poor", value: 1, color: "text-red-600" },
 ];
 
 const ClassEvaluation: React.FC = () => {
-  const { classId } = useParams<{ classId: string }>();
-  const [isActive, setIsActive] = useState(true); // Set to true for testing
-  const [showForm, setShowForm] = useState(false);
+  const { ClassId } = useParams<{ ClassId: string }>();
+  const { classDetails } = useOutletContext<{ classDetails: any }>();
+  const { user } = useAuthStore();
+  
+  const [evaluationSession, setEvaluationSession] = useState<EvaluationSession | null>(null);
+  const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
+  const [categories, setCategories] = useState<EvaluationCategory[]>([]);
+  const [answers, setAnswers] = useState<{ [key: number]: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAnswerChange = (questionId: number, value: string) => {
+  useEffect(() => {
+    const fetchEvaluationData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Check if there's an active evaluation session for this course
+        const sessionResponse = await api.get(`/api/users/v1/evaluation/session/${ClassId}/status`);
+        
+        if (!sessionResponse.data.success) {
+          setError("No active evaluation session found for this course.");
+          return;
+        }
+
+        // Fetch evaluation questions
+        const questionsResponse = await api.get('/api/users/v1/evaluation/questions');
+        setQuestions(questionsResponse.data);
+
+        // Fetch evaluation categories
+        const categoriesResponse = await api.get('/api/users/v1/evaluation/categories');
+        setCategories(categoriesResponse.data);
+
+        setEvaluationSession({
+          id: 1, // This should come from the session response
+          courseSessionId: parseInt(ClassId!),
+          isActive: true,
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          courseCode: classDetails?.code || '',
+          courseName: classDetails?.name || ''
+        });
+
+      } catch (err: any) {
+        console.error('Error fetching evaluation data:', err);
+        if (err.response?.status === 404) {
+          setError("No active evaluation session found for this course.");
+        } else {
+          setError("Failed to load evaluation data. Please try again later.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (ClassId) {
+      fetchEvaluationData();
+    }
+  }, [ClassId, classDetails]);
+
+  const handleAnswerChange = (questionId: number, answerId: number) => {
     setAnswers(prev => ({
       ...prev,
-      [questionId]: value
+      [questionId]: answerId
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically send the answers to your backend
-    setSubmitted(true);
+    
+    if (!isFormValid()) {
+      setError("Please answer all questions before submitting.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const submissionAnswers: SubmissionAnswer[] = Object.entries(answers).map(([questionId, answerId]) => ({
+        questionId: parseInt(questionId),
+        answerId: answerId
+      }));
+
+      await api.post('/api/users/v1/evaluation/submit', {
+        lecturerId: 1, // This should be fetched from the course session
+        courseSessionId: parseInt(ClassId!),
+        answers: submissionAnswers
+      });
+
+      setSubmitted(true);
+    } catch (err: any) {
+      console.error('Error submitting evaluation:', err);
+      setError(err.response?.data?.message || "Failed to submit evaluation. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const isFormValid = () => {
-    return evaluationQuestions.every(q => answers[q.id]);
+    return questions.every(q => answers[q.id]);
   };
 
-  if (!isActive) {
+  const getCompletionPercentage = () => {
+    const answeredQuestions = Object.keys(answers).length;
+    return Math.round((answeredQuestions / questions.length) * 100);
+  };
+
+  if (loading) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="info">
-          Evaluation period is currently inactive. Please check back later.
-        </Alert>
-      </Box>
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (error && !evaluationSession) {
+    return (
+      <div className="text-center py-12">
+        <ExclamationTriangleIcon className="h-16 w-16 text-warning-500 mx-auto mb-4" />
+        <h3 className="heading-4 mb-2">Evaluation Not Available</h3>
+        <p className="body-default text-foreground-secondary mb-4">{error}</p>
+        <div className="status-info p-4 rounded-lg">
+          <p className="body-small">
+            Evaluation periods are activated by administrators. Please check back later or contact your instructor for more information.
+          </p>
+        </div>
+      </div>
     );
   }
 
   if (submitted) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="h3" sx={{ mb: 2 }}>
-          Submitted
-        </Typography>
-        <Typography variant="h5">
-          Thank you for your response!
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (!showForm) {
-    return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>
-          Evaluation page is active
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => setShowForm(true)}
-        >
-          Start Evaluation
-        </Button>
-      </Box>
+      <div className="text-center py-12">
+        <CheckCircleIcon className="h-16 w-16 text-success-500 mx-auto mb-4" />
+        <h3 className="heading-3 mb-2">Evaluation Submitted Successfully!</h3>
+        <p className="body-default text-foreground-secondary mb-6">
+          Thank you for your feedback. Your responses help improve the quality of education.
+        </p>
+        <div className="status-success p-4 rounded-lg max-w-md mx-auto">
+          <p className="body-small">
+            Your evaluation has been recorded and will be used to enhance the learning experience for future students.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" sx={{ mb: 3 }}>
-          Course Evaluation
-        </Typography>
-        <form onSubmit={handleSubmit}>
-          {evaluationQuestions.map((question) => (
-            <FormControl key={question.id} component="fieldset" sx={{ mb: 3, width: '100%' }}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                {question.question}
-              </Typography>
-              <RadioGroup
-                value={answers[question.id] || ''}
-                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-              >
-                <FormControlLabel
-                  value="very_satisfied"
-                  control={<Radio />}
-                  label="Very Satisfied"
-                />
-                <FormControlLabel
-                  value="satisfied"
-                  control={<Radio />}
-                  label="Satisfied"
-                />
-                <FormControlLabel
-                  value="neutral"
-                  control={<Radio />}
-                  label="Neutral"
-                />
-                <FormControlLabel
-                  value="unsatisfied"
-                  control={<Radio />}
-                  label="Unsatisfied"
-                />
-                <FormControlLabel
-                  value="very_unsatisfied"
-                  control={<Radio />}
-                  label="Very Unsatisfied"
-                />
-              </RadioGroup>
-            </FormControl>
-          ))}
-          <Button
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="heading-3 flex items-center">
+            <ClipboardDocumentCheckIcon className="h-6 w-6 mr-2 text-primary-500" />
+            Course Evaluation
+          </h2>
+          <p className="body-default text-foreground-secondary mt-1">
+            Help us improve by sharing your feedback about this course
+          </p>
+        </div>
+        <div className="text-right">
+          <div className="body-small text-foreground-secondary">Progress</div>
+          <div className="heading-4 text-primary-600">{getCompletionPercentage()}%</div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="w-full bg-background-secondary rounded-full h-2">
+        <div 
+          className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+          style={{ width: `${getCompletionPercentage()}%` }}
+        ></div>
+      </div>
+
+      {/* Course Information */}
+      <div className="card bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800">
+        <div className="flex items-start">
+          <InformationCircleIcon className="h-5 w-5 text-primary-600 mt-0.5 mr-3" />
+          <div>
+            <h4 className="body-default font-medium text-primary-900 dark:text-primary-100">
+              {classDetails?.code} - {classDetails?.name}
+            </h4>
+            <p className="body-small text-primary-700 dark:text-primary-300 mt-1">
+              Instructor: {classDetails?.instructor} | Credits: {classDetails?.credits}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="status-error p-4 rounded-lg">
+          <p className="body-default">{error}</p>
+        </div>
+      )}
+
+      {/* Evaluation Form */}
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {categories.map((category) => {
+          const categoryQuestions = questions.filter(q => q.category.id === category.id);
+          
+          if (categoryQuestions.length === 0) return null;
+
+          return (
+            <div key={category.id} className="card">
+              <div className="mb-6">
+                <h3 className="heading-4 text-primary-600 mb-2">{category.name}</h3>
+                <p className="body-small text-foreground-secondary">{category.description}</p>
+              </div>
+
+              <div className="space-y-6">
+                {categoryQuestions.map((question) => (
+                  <div key={question.id} className="space-y-3">
+                    <h4 className="body-default font-medium text-foreground">
+                      {question.question}
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+                      {ratingOptions.map((option) => (
+                        <label
+                          key={option.id}
+                          className={`
+                            flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200
+                            ${answers[question.id] === option.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-border hover:border-primary-300 hover:bg-background-secondary'
+                            }
+                          `}
+                        >
+                          <input
+                            type="radio"
+                            name={`question-${question.id}`}
+                            value={option.id}
+                            checked={answers[question.id] === option.id}
+                            onChange={() => handleAnswerChange(question.id, option.id)}
+                            className="sr-only"
+                          />
+                          <div className="text-center">
+                            <div className={`body-small font-medium ${option.color}`}>
+                              {option.value}
+                            </div>
+                            <div className="caption mt-1">{option.label}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Submit Button */}
+        <div className="flex justify-end pt-6 border-t border-border">
+          <button
             type="submit"
-            variant="contained"
-            color="primary"
-            disabled={!isFormValid()}
-            sx={{ mt: 2 }}
+            disabled={!isFormValid() || submitting}
+            className="btn btn-primary px-8 py-3 text-base"
           >
-            Submit Evaluation
-          </Button>
-        </form>
-      </Paper>
-    </Box>
+            {submitting ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Submitting...
+              </div>
+            ) : (
+              "Submit Evaluation"
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 };
 
-export default ClassEvaluation; 
+export default ClassEvaluation;
