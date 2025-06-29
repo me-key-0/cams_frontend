@@ -101,21 +101,63 @@ export default function ClassAssessments() {
         setLoading(true);
         setError(null);
 
+        if (!ClassId || !user?.id) {
+          setError("Missing required information to load assessments.");
+          return;
+        }
+
         // Fetch student's assessment overview for this course session
         const response = await api.get(`/api/grades/grading/my-assessments/course-session/${ClassId}`);
-        setAssessmentOverview(response.data);
+        
+        // Validate response data
+        if (!response.data) {
+          console.warn('No data received from assessments API');
+          setAssessmentOverview(null);
+          return;
+        }
+
+        // Ensure assessments array exists and is valid
+        const data = response.data;
+        const validatedData: AssessmentOverview = {
+          courseSessionId: data.courseSessionId || parseInt(ClassId),
+          courseCode: data.courseCode || classDetails?.code || '',
+          courseName: data.courseName || classDetails?.name || '',
+          assessments: Array.isArray(data.assessments) ? data.assessments.map((assessment: any) => ({
+            ...assessment,
+            attachments: Array.isArray(assessment.attachments) ? assessment.attachments : [],
+            mySubmission: assessment.mySubmission ? {
+              ...assessment.mySubmission,
+              attachments: Array.isArray(assessment.mySubmission.attachments) ? assessment.mySubmission.attachments : []
+            } : undefined
+          })) : [],
+          totalAssessments: data.totalAssessments || 0,
+          completedAssessments: data.completedAssessments || 0,
+          pendingAssessments: data.pendingAssessments || 0,
+          overallGrade: data.overallGrade || 0,
+          overallLetterGrade: data.overallLetterGrade || 'N/A'
+        };
+
+        setAssessmentOverview(validatedData);
       } catch (err: any) {
         console.error('Error fetching assessments:', err);
-        setError("Failed to load assessments. Please try again later.");
+        
+        if (err.response?.status === 404) {
+          setError("No assessments found for this course.");
+        } else if (err.response?.status === 403) {
+          setError("You don't have permission to view assessments for this course.");
+        } else {
+          setError("Failed to load assessments. Please try again later.");
+        }
+        
+        // Set null on error to prevent further issues
+        setAssessmentOverview(null);
       } finally {
         setLoading(false);
       }
     };
 
-    if (ClassId && user?.id) {
-      fetchAssessments();
-    }
-  }, [ClassId, user?.id]);
+    fetchAssessments();
+  }, [ClassId, user?.id, classDetails]);
 
   const getAssessmentStatus = (assessment: Assessment) => {
     if (assessment.isOverdue && !assessment.mySubmission) {
@@ -133,6 +175,9 @@ export default function ClassAssessments() {
   const handleDownloadAttachment = async (downloadUrl: string, fileName: string) => {
     try {
       const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error('Failed to download file');
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -166,7 +211,7 @@ export default function ClassAssessments() {
     );
   }
 
-  if (!assessmentOverview) {
+  if (!assessmentOverview || !assessmentOverview.assessments || assessmentOverview.assessments.length === 0) {
     return (
       <div className="card text-center py-12">
         <ClipboardDocumentListIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
@@ -230,6 +275,12 @@ export default function ClassAssessments() {
           const config = statusConfig[status];
           const IconComponent = config.icon;
           
+          // Ensure attachments is always an array
+          const attachments = Array.isArray(assessment.attachments) ? assessment.attachments : [];
+          const submissionAttachments = assessment.mySubmission?.attachments && Array.isArray(assessment.mySubmission.attachments) 
+            ? assessment.mySubmission.attachments 
+            : [];
+          
           return (
             <div key={assessment.id} className="card">
               <div className="flex items-start justify-between mb-4">
@@ -279,11 +330,11 @@ export default function ClassAssessments() {
                     </div>
 
                     {/* Attachments */}
-                    {assessment.attachments.length > 0 && (
+                    {attachments.length > 0 && (
                       <div className="mb-4">
                         <h4 className="body-small font-medium text-foreground mb-2">Attachments:</h4>
                         <div className="space-y-2">
-                          {assessment.attachments.map((attachment) => (
+                          {attachments.map((attachment) => (
                             <button
                               key={attachment.id}
                               onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
@@ -339,11 +390,11 @@ export default function ClassAssessments() {
                           </div>
                         )}
                         
-                        {assessment.mySubmission.attachments.length > 0 && (
+                        {submissionAttachments.length > 0 && (
                           <div className="mt-3">
                             <span className="body-small text-foreground-secondary">Your Files:</span>
                             <div className="mt-1 space-y-1">
-                              {assessment.mySubmission.attachments.map((attachment) => (
+                              {submissionAttachments.map((attachment) => (
                                 <button
                                   key={attachment.id}
                                   onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
