@@ -12,6 +12,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../stores/authStore";
+import { ThemeSwitcher } from "../theme/ThemeSwitcher";
 
 const studentNavigation = [
   { name: "Dashboard", href: "/student", icon: HomeIcon },
@@ -58,52 +59,61 @@ export default function Layout() {
   const navigation =
     user?.role.toLowerCase() === "lecturer" ? lecturerNavigation : studentNavigation;
 
+  const currentPage = navigation.find((item) => item.href === location.pathname);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Mobile sidebar */}
       <div
-        className={`fixed inset-0 z-40 lg:hidden ${
+        className={`fixed inset-0 z-50 lg:hidden ${
           sidebarOpen ? "" : "hidden"
         }`}
       >
         <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-75"
+          className="fixed inset-0 bg-foreground/25 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
-          <div className="flex h-16 items-center justify-between px-4">
-            <span className="text-xl font-semibold text-primary-600">CAMS</span>
-            <button onClick={() => setSidebarOpen(false)}>
-              <XMarkIcon className="h-6 w-6 text-gray-500" />
+        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-background border-r border-border shadow-strong">
+          <div className="flex h-16 items-center justify-between px-6">
+            <span className="heading-4 gradient-text">CAMS</span>
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 text-foreground-secondary hover:text-foreground hover:bg-background-secondary rounded-lg transition-colors duration-200"
+            >
+              <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="flex-1 space-y-1 px-4 py-6">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group flex items-center rounded-lg px-2 py-2 text-sm font-medium ${
+                className={`group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   location.pathname === item.href
-                    ? "bg-primary-50 text-primary-600"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+                    : "text-foreground-secondary hover:bg-background-secondary hover:text-foreground"
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon
-                  className={`mr-3 h-5 w-5 flex-shrink-0 ${
+                  className={`mr-3 h-5 w-5 flex-shrink-0 transition-colors duration-200 ${
                     location.pathname === item.href
-                      ? "text-primary-600"
-                      : "text-gray-400 group-hover:text-gray-500"
+                      ? "text-primary-600 dark:text-primary-400"
+                      : "text-foreground-tertiary group-hover:text-foreground-secondary"
                   }`}
                 />
                 {item.name}
               </Link>
             ))}
           </nav>
-          <div className="border-t border-gray-200 p-4">
+          <div className="border-t border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="body-small">Theme</span>
+              <ThemeSwitcher />
+            </div>
             <button
               onClick={clearToken}
-              className="flex w-full items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+              className="flex w-full items-center justify-center rounded-lg bg-error-50 px-3 py-2.5 text-sm font-medium text-error-700 hover:bg-error-100 dark:bg-error-900/20 dark:text-error-300 dark:hover:bg-error-900/30 transition-colors duration-200"
             >
               Logout
             </button>
@@ -113,36 +123,40 @@ export default function Layout() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex min-h-0 flex-1 flex-col border-r border-gray-200 bg-white">
-          <div className="flex h-16 items-center px-4">
-            <span className="text-xl font-semibold text-primary-600">CAMS</span>
+        <div className="flex min-h-0 flex-1 flex-col border-r border-border bg-background">
+          <div className="flex h-16 items-center px-6">
+            <span className="heading-4 gradient-text">CAMS</span>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="flex-1 space-y-1 px-4 py-6">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`group flex items-center rounded-lg px-2 py-2 text-sm font-medium ${
+                className={`group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                   location.pathname === item.href
-                    ? "bg-primary-50 text-primary-600"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    ? "bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+                    : "text-foreground-secondary hover:bg-background-secondary hover:text-foreground"
                 }`}
               >
                 <item.icon
-                  className={`mr-3 h-5 w-5 flex-shrink-0 ${
+                  className={`mr-3 h-5 w-5 flex-shrink-0 transition-colors duration-200 ${
                     location.pathname === item.href
-                      ? "text-primary-600"
-                      : "text-gray-400 group-hover:text-gray-500"
+                      ? "text-primary-600 dark:text-primary-400"
+                      : "text-foreground-tertiary group-hover:text-foreground-secondary"
                   }`}
                 />
                 {item.name}
               </Link>
             ))}
           </nav>
-          <div className="border-t border-gray-200 p-4">
+          <div className="border-t border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="body-small">Theme</span>
+              <ThemeSwitcher />
+            </div>
             <button
               onClick={clearToken}
-              className="flex w-full items-center justify-center rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+              className="flex w-full items-center justify-center rounded-lg bg-error-50 px-3 py-2.5 text-sm font-medium text-error-700 hover:bg-error-100 dark:bg-error-900/20 dark:text-error-300 dark:hover:bg-error-900/30 transition-colors duration-200"
             >
               Logout
             </button>
@@ -152,32 +166,46 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        <div className="sticky top-0 z-10 flex h-16 flex-shrink-0 border-b border-gray-200 bg-white">
+        <div className="sticky top-0 z-40 flex h-16 flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-md">
           <button
             type="button"
-            className="border-r border-gray-200 px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden"
+            className="border-r border-border px-4 text-foreground-secondary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden hover:text-foreground hover:bg-background-secondary transition-colors duration-200"
             onClick={() => setSidebarOpen(true)}
           >
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon className="h-6 w-6" />
           </button>
-          <div className="flex flex-1 justify-between px-4">
-            <div className="flex flex-1">
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {navigation.find((item) => item.href === location.pathname)
-                  ?.name || "Dashboard"}
+          <div className="flex flex-1 justify-between px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-1 items-center">
+              <h1 className="heading-3">
+                {currentPage?.name || "Dashboard"}
               </h1>
             </div>
-            <div className="ml-4 flex items-center">
-              <span className="text-sm text-gray-700">
-                Welcome, {user?.firstName} {user?.lastName}
-              </span>
+            <div className="ml-4 flex items-center space-x-4">
+              <div className="hidden lg:block">
+                <ThemeSwitcher />
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="h-8 w-8 rounded-full bg-primary-100 dark:bg-primary-900/20 flex items-center justify-center">
+                  <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </span>
+                </div>
+                <div className="hidden sm:block">
+                  <span className="body-small font-medium text-foreground">
+                    {user?.firstName} {user?.lastName}
+                  </span>
+                  <div className="caption text-foreground-tertiary">
+                    {user?.role}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <main className="py-6">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <main className="py-6 lg:py-8">
+          <div className="container-responsive">
             <Outlet />
           </div>
         </main>
