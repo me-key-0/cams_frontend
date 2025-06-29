@@ -58,7 +58,7 @@ useEffect(() => {
       const lecturerIds = response.data;
 
       if (Array.isArray(lecturerIds) && lecturerIds.length > 0) {
-        const lecturerPromises = lecturerIds.map(async (lecturerId) => {
+        const lecturerPromises = lecturerIds?.map(async (lecturerId) => {
           try {
             const lecturerResponse = await api.get(`/api/users/lecturer/${lecturerId}`);
             return lecturerResponse.data;
@@ -87,7 +87,6 @@ useEffect(() => {
 
   fetchLecturers();
 }, [ClassId]);
-
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -141,7 +140,13 @@ useEffect(() => {
 
       // Load chat history
       const history = await chatService.getChatHistory(room.roomId);
-      setMessages(history.reverse()); // Reverse to show oldest first
+      if (Array.isArray(history)) {
+        setMessages([...history].reverse()); // Use a copy before reversing
+      } else {
+        console.error("Chat history is not an array:", history);
+        setMessages([]); // or handle differently
+      }
+      // setMessages(history.reverse()); // Reverse to show oldest first
 
       // Mark messages as read
       await chatService.markMessagesAsRead(room.roomId);
@@ -275,9 +280,9 @@ useEffect(() => {
             </div>
           ) : (
             <div className="p-2">
-              {lecturers.map((lecturer) => (
+              {lecturers?.map((lecturer) => (
                 <button
-                  key={lecturer.id}
+                  key={lecturer?.id}
                   onClick={() => handleLecturerSelect(lecturer)}
                   className={`
                     w-full p-3 rounded-lg text-left transition-all duration-200 mb-2
@@ -290,12 +295,12 @@ useEffect(() => {
                   <div className="flex items-center">
                     <div className="h-10 w-10 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mr-3">
                       <span className="body-small font-medium text-primary-700 dark:text-primary-300">
-                        {lecturer.firstName[0]}{lecturer.lastName[0]}
+                        {lecturer?.firstName?.charAt(0) ?? ''}{lecturer?.lastName?.charAt(0) ?? ''}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="body-default font-medium text-foreground truncate">
-                        {lecturer.firstName} {lecturer.lastName}
+                        {lecturer?.firstName} {lecturer?.lastName}
                       </p>
                       <p className="body-small text-foreground-secondary truncate">
                         {lecturer.department}

@@ -69,7 +69,16 @@ export const chatService = {
     const response = await api.get(`/api/com/chat/rooms/${roomId}/messages`, {
       params: { page, size }
     });
-    return response.data;
+    // return response.data;
+    const data = response.data;
+
+  // Defensive check
+  if (data && Array.isArray(data.content)) {
+    return data.content;
+  }
+
+  console.error("Unexpected response for chat history:", data);
+  return []; // fallback
   },
 
   // Mark messages as read
