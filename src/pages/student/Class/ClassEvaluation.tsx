@@ -4,7 +4,8 @@ import {
   ClipboardDocumentCheckIcon, 
   CheckCircleIcon, 
   ExclamationTriangleIcon,
-  InformationCircleIcon 
+  InformationCircleIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../../stores/authStore';
 import api from '../../../api/config';
@@ -60,6 +61,7 @@ const ClassEvaluation: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<'inactive' | 'active' | 'not_found'>('inactive');
 
   useEffect(() => {
     const fetchEvaluationData = async () => {
@@ -67,47 +69,71 @@ const ClassEvaluation: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Check if there's an active evaluation session for this course
-        const sessionResponse = await api.get(`/api/users/v1/evaluation/session/${ClassId}/status`);
-        
-        if (!sessionResponse.data.success) {
-          setError("No active evaluation session found for this course.");
+        if (!ClassId) {
+          setError("Course session ID is required.");
           return;
         }
 
-        // Fetch evaluation questions
-        const questionsResponse = await api.get('/api/users/v1/evaluation/questions');
-        setQuestions(questionsResponse.data);
+        // First, try to check if there's an active evaluation session
+        try {
+          const sessionResponse = await api.get(`/api/users/v1/evaluation/session/${ClassId}/status`);
+          
+          if (sessionResponse.data?.success) {
+            setSessionStatus('active');
+            setEvaluationSession({
+              id: parseInt(ClassId),
+              courseSessionId: parseInt(ClassId),
+              isActive: true,
+              startDate: new Date().toISOString(),
+              endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              courseCode: classDetails?.code || '',
+              courseName: classDetails?.name || ''
+            });
+          } else {
+            setSessionStatus('inactive');
+            return;
+          }
+        } catch (sessionErr: any) {
+          console.log('Session check failed:', sessionErr.response?.status);
+          
+          if (sessionErr.response?.status === 404) {
+            setSessionStatus('not_found');
+            return;
+          } else {
+            // For other errors, still try to load questions in case it's a temporary issue
+            setSessionStatus('inactive');
+          }
+        }
 
-        // Fetch evaluation categories
-        const categoriesResponse = await api.get('/api/users/v1/evaluation/categories');
-        setCategories(categoriesResponse.data);
+        // If we have an active session, fetch questions and categories
+        if (sessionStatus === 'active' || sessionStatus === 'inactive') {
+          try {
+            // Fetch evaluation questions
+            const questionsResponse = await api.get('/api/users/v1/evaluation/questions');
+            if (questionsResponse.data && Array.isArray(questionsResponse.data)) {
+              setQuestions(questionsResponse.data);
+            }
 
-        setEvaluationSession({
-          id: 1, // This should come from the session response
-          courseSessionId: parseInt(ClassId!),
-          isActive: true,
-          startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          courseCode: classDetails?.code || '',
-          courseName: classDetails?.name || ''
-        });
+            // Fetch evaluation categories
+            const categoriesResponse = await api.get('/api/users/v1/evaluation/categories');
+            if (categoriesResponse.data && Array.isArray(categoriesResponse.data)) {
+              setCategories(categoriesResponse.data);
+            }
+          } catch (dataErr: any) {
+            console.error('Error fetching evaluation data:', dataErr);
+            // Don't set error here as we want to show the session status message
+          }
+        }
 
       } catch (err: any) {
-        console.error('Error fetching evaluation data:', err);
-        if (err.response?.status === 404) {
-          setError("No active evaluation session found for this course.");
-        } else {
-          setError("Failed to load evaluation data. Please try again later.");
-        }
+        console.error('Error in fetchEvaluationData:', err);
+        setError("Failed to load evaluation data. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    if (ClassId) {
-      fetchEvaluationData();
-    }
+    fetchEvaluationData();
   }, [ClassId, classDetails]);
 
   const handleAnswerChange = (questionId: number, answerId: number) => {
@@ -150,10 +176,11 @@ const ClassEvaluation: React.FC = () => {
   };
 
   const isFormValid = () => {
-    return questions.every(q => answers[q.id]);
+    return questions.length > 0 && questions.every(q => answers[q.id]);
   };
 
   const getCompletionPercentage = () => {
+    if (questions.length === 0) return 0;
     const answeredQuestions = Object.keys(answers).length;
     return Math.round((answeredQuestions / questions.length) * 100);
   };
@@ -166,17 +193,47 @@ const ClassEvaluation: React.FC = () => {
     );
   }
 
+  // Handle different session states
+  if (sessionStatus === 'not_found' || sessionStatus === 'inactive') {
+    return (
+      <div className="text-center py-12">
+        <ClockIcon className="h-16 w-16 text-warning-500 mx-auto mb-4" />
+        <h3 className="heading-4 mb-2">Evaluation Not Available</h3>
+        <p className="body-default text-foreground-secondary mb-6">
+          {sessionStatus === 'not_found' 
+            ? "No evaluation session has been created for this course yet."
+            : "The evaluation period for this course is currently inactive."
+          }
+        </p>
+        <div className="status-info p-4 rounded-lg max-w-md mx-auto">
+          <div className="flex items-start">
+            <InformationCircleIcon className="h-5 w-5 text-primary-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div className="text-left">
+              <p className="body-small font-medium mb-2">What does this mean?</p>
+              <ul className="body-small space-y-1 text-foreground-secondary">
+                <li>• Evaluation periods are activated by course administrators</li>
+                <li>• You'll be notified when evaluation becomes available</li>
+                <li>• Check back later or contact your instructor for updates</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error && !evaluationSession) {
     return (
       <div className="text-center py-12">
-        <ExclamationTriangleIcon className="h-16 w-16 text-warning-500 mx-auto mb-4" />
-        <h3 className="heading-4 mb-2">Evaluation Not Available</h3>
+        <ExclamationTriangleIcon className="h-16 w-16 text-error-500 mx-auto mb-4" />
+        <h3 className="heading-4 mb-2">Error Loading Evaluation</h3>
         <p className="body-default text-foreground-secondary mb-4">{error}</p>
-        <div className="status-info p-4 rounded-lg">
-          <p className="body-small">
-            Evaluation periods are activated by administrators. Please check back later or contact your instructor for more information.
-          </p>
-        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="btn btn-primary"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -194,6 +251,19 @@ const ClassEvaluation: React.FC = () => {
             Your evaluation has been recorded and will be used to enhance the learning experience for future students.
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // If no questions are available, show a message
+  if (questions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <ClipboardDocumentCheckIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+        <h3 className="heading-4 mb-2">No Evaluation Questions Available</h3>
+        <p className="body-default text-foreground-secondary">
+          Evaluation questions have not been set up for this course yet.
+        </p>
       </div>
     );
   }
