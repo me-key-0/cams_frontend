@@ -3,33 +3,234 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Light mode colors */
+    --color-background: 255 255 255;
+    --color-background-secondary: 249 250 251;
+    --color-background-tertiary: 243 244 246;
+    --color-foreground: 17 24 39;
+    --color-foreground-secondary: 75 85 99;
+    --color-foreground-tertiary: 156 163 175;
+    --color-border: 229 231 235;
+    --color-border-secondary: 243 244 246;
+  }
+
+  .dark {
+    /* Dark mode colors */
+    --color-background: 3 7 18;
+    --color-background-secondary: 15 23 42;
+    --color-background-tertiary: 30 41 59;
+    --color-foreground: 248 250 252;
+    --color-foreground-secondary: 203 213 225;
+    --color-foreground-tertiary: 148 163 184;
+    --color-border: 51 65 85;
+    --color-border-secondary: 30 41 59;
+  }
+
   html {
-    @apply antialiased;
+    @apply antialiased scroll-smooth;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   body {
-    @apply text-gray-900 bg-gray-50;
+    @apply bg-background text-foreground transition-colors duration-300;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-foreground-tertiary;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-background;
+  }
+
+  /* Selection styles */
+  ::selection {
+    @apply bg-primary-100 text-primary-900;
+  }
+
+  .dark ::selection {
+    @apply bg-primary-900 text-primary-100;
   }
 }
 
 @layer components {
+  /* Button components */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700;
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 shadow-sm hover:shadow-md;
   }
 
   .btn-secondary {
-    @apply bg-secondary-100 text-secondary-900 hover:bg-secondary-200;
+    @apply bg-background-secondary text-foreground border border-border hover:bg-background-tertiary focus:ring-primary-500;
   }
 
+  .btn-ghost {
+    @apply text-foreground-secondary hover:text-foreground hover:bg-background-secondary focus:ring-primary-500;
+  }
+
+  .btn-danger {
+    @apply bg-error-600 text-white hover:bg-error-700 focus:ring-error-500 shadow-sm hover:shadow-md;
+  }
+
+  /* Input components */
   .input {
-    @apply w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-4 py-2.5 text-sm bg-background border border-border rounded-lg transition-all duration-200 placeholder:text-foreground-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
 
+  .input-error {
+    @apply border-error-500 focus:ring-error-500;
+  }
+
+  /* Card components */
   .card {
-    @apply bg-white rounded-xl shadow-sm p-6;
+    @apply bg-background border border-border rounded-xl shadow-soft p-6 transition-all duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-medium hover:border-border-secondary;
+  }
+
+  .card-interactive {
+    @apply cursor-pointer hover:shadow-medium hover:border-border-secondary hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* Typography components */
+  .heading-1 {
+    @apply text-3xl md:text-4xl font-bold text-foreground tracking-tight;
+  }
+
+  .heading-2 {
+    @apply text-2xl md:text-3xl font-bold text-foreground tracking-tight;
+  }
+
+  .heading-3 {
+    @apply text-xl md:text-2xl font-semibold text-foreground tracking-tight;
+  }
+
+  .heading-4 {
+    @apply text-lg md:text-xl font-semibold text-foreground;
+  }
+
+  .body-large {
+    @apply text-lg text-foreground-secondary leading-relaxed;
+  }
+
+  .body-default {
+    @apply text-base text-foreground-secondary leading-relaxed;
+  }
+
+  .body-small {
+    @apply text-sm text-foreground-secondary;
+  }
+
+  .caption {
+    @apply text-xs text-foreground-tertiary uppercase tracking-wider font-medium;
+  }
+
+  /* Layout components */
+  .container-responsive {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-spacing {
+    @apply py-12 md:py-16 lg:py-20;
+  }
+
+  /* Animation utilities */
+  .animate-in {
+    @apply animate-fade-in;
+  }
+
+  .animate-slide-in {
+    @apply animate-slide-in;
+  }
+
+  .animate-scale-in {
+    @apply animate-scale-in;
+  }
+
+  /* Status indicators */
+  .status-success {
+    @apply bg-success-50 text-success-700 border-success-200;
+  }
+
+  .status-warning {
+    @apply bg-warning-50 text-warning-700 border-warning-200;
+  }
+
+  .status-error {
+    @apply bg-error-50 text-error-700 border-error-200;
+  }
+
+  .status-info {
+    @apply bg-primary-50 text-primary-700 border-primary-200;
+  }
+
+  .dark .status-success {
+    @apply bg-success-900/20 text-success-300 border-success-800;
+  }
+
+  .dark .status-warning {
+    @apply bg-warning-900/20 text-warning-300 border-warning-800;
+  }
+
+  .dark .status-error {
+    @apply bg-error-900/20 text-error-300 border-error-800;
+  }
+
+  .dark .status-info {
+    @apply bg-primary-900/20 text-primary-300 border-primary-800;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-md border border-border/50;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
