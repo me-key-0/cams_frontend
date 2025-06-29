@@ -65,15 +65,49 @@ export default function ClassNotifications() {
         // Fetch notifications for the student
         const response = await api.get('/api/com/notifications/student');
         
+        // Validate response data
+        if (!response.data) {
+          console.warn('No data received from notifications API');
+          setNotifications([]);
+          return;
+        }
+
+        // Ensure response.data is an array
+        const notificationsData = Array.isArray(response.data) ? response.data : [];
+        
+        if (notificationsData.length === 0) {
+          setNotifications([]);
+          return;
+        }
+
         // Filter notifications for this specific course session
-        const courseNotifications = response.data.filter(
-          (notification: any) => notification.courseSessionId === parseInt(ClassId!)
+        const courseNotifications = notificationsData.filter(
+          (notification: any) => {
+            // Handle both string and number courseSessionId
+            const notificationCourseId = typeof notification.courseSessionId === 'string' 
+              ? parseInt(notification.courseSessionId) 
+              : notification.courseSessionId;
+            const currentClassId = parseInt(ClassId!);
+            
+            return notificationCourseId === currentClassId;
+          }
         );
 
         setNotifications(courseNotifications);
       } catch (err: any) {
         console.error('Error fetching notifications:', err);
-        setError("Failed to load notifications. Please try again later.");
+        
+        // More specific error handling
+        if (err.response?.status === 404) {
+          setError("No notifications found for this course.");
+        } else if (err.response?.status === 403) {
+          setError("You don't have permission to view notifications for this course.");
+        } else {
+          setError("Failed to load notifications. Please try again later.");
+        }
+        
+        // Set empty array on error to prevent further issues
+        setNotifications([]);
       } finally {
         setLoading(false);
       }
@@ -159,13 +193,13 @@ export default function ClassNotifications() {
           <BellIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
           <h3 className="heading-4 mb-2">No Notifications</h3>
           <p className="body-default text-foreground-secondary">
-            You're all caught up! New notifications will appear here.
+            {error ? "Unable to load notifications at this time." : "You're all caught up! New notifications will appear here."}
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {notifications.map((notification) => {
-            const config = notificationTypeConfig[notification.type];
+            const config = notificationTypeConfig[notification.type] || notificationTypeConfig.general;
             const IconComponent = config.icon;
             
             return (
@@ -203,7 +237,7 @@ export default function ClassNotifications() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center text-foreground-tertiary">
                           <span className="body-small">
-                            From: {notification.lecturerName}
+                            From: {notification.lecturerName || 'System'}
                           </span>
                           <span className="mx-2">•</span>
                           <span className="body-small">
