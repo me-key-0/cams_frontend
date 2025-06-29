@@ -64,7 +64,7 @@ const resourceService = {
 
   // Get single resource
   getResource: async (id: number): Promise<Resource> => {
-    const response = await axios.get(`/api/v1/resources/${id}`);
+    const response = await axios.get(`/api/v1/resources/download/cd2d8069-91b4-4f84-ae1e-73016ef9b230.docx/${id}`);
     return response.data;
   },
 

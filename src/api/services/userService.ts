@@ -11,6 +11,7 @@ import api from '../config';
 export const getLecturerIdFromUserId = async (userId: string): Promise<number | null> => {
   try {
     const response = await api.get(`/api/users/lecturer/user/${userId}`);
+    
     if (response.data) {
       return response.data.id;
     }
