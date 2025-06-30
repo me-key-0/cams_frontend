@@ -40,6 +40,7 @@ import LecturerClassResources from "./pages/lecturer/ClassResources";
 import ClassesGrades from "./pages/lecturer/classes/ClassesGrades";
 import ClassesAssessments from "./pages/lecturer/classes/ClassesAssessments";
 import ClassesChat from "./pages/lecturer/classes/ClassesChat";
+import ClassesNotifications from "./pages/lecturer/classes/ClassesNotifications";
 
 function App() {
   return (
@@ -124,6 +125,7 @@ function App() {
                 <Route path="resources" element={<LecturerClassResources />} />
                 <Route path="grades" element={<ClassesGrades />} />
                 <Route path="assessments" element={<ClassesAssessments />} />
+                <Route path="notifications" element={<ClassesNotifications />} />
                 <Route path="chat" element={<ClassesChat />} />
               </Route>
               <Route path="/lecturer/resources" element={<LecturerResources />} />

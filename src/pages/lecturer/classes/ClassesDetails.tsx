@@ -9,6 +9,7 @@ import {
   CalendarIcon,
   ClockIcon,
   CogIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../../stores/authStore";
 import api from "../../../api/config";
@@ -17,6 +18,7 @@ const navigation = [
   { name: "Resources", href: "resources", icon: BookOpenIcon },
   { name: "Grades", href: "grades", icon: AcademicCapIcon },
   { name: "Assessments", href: "assessments", icon: ClipboardDocumentListIcon },
+  { name: "Notifications", href: "notifications", icon: BellIcon },
   { name: "Chat", href: "chat", icon: ChatBubbleLeftRightIcon },
 ];
 
