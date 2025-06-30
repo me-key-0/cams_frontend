@@ -3,7 +3,8 @@ export enum ResourceType {
     VIDEO = 'VIDEO',
     PHOTO = 'PHOTO',
     LINK = 'LINK',
-    FOLDER = 'FOLDER'
+    AUDIO = 'AUDIO',
+    ARCHIVE = 'ARCHIVE'
 }
 
 export enum ResourceStatus {
@@ -16,16 +17,20 @@ export interface ResourceMaterial {
     id: number;
     title: string;
     description?: string;
-    type: ResourceType;
-    fileUrl: string;
     fileName: string;
+    originalFileName: string;
+    type: ResourceType;
     fileSize: number;
+    mimeType: string;
     categories: string[];
     downloadCount: number;
     uploadedAt: string;
     courseSessionId: number;
     uploadedBy: number;
+    uploaderName: string;
     status: ResourceStatus;
+    fileSizeFormatted: string;
+    linkUrl?: string; // For LINK type resources
 }
 
 export interface CreateResourceRequest {
@@ -33,8 +38,17 @@ export interface CreateResourceRequest {
     description?: string;
     type: ResourceType;
     courseSessionId: number;
-    uploadedBy: number;
     categories: string[];
+    linkUrl?: string; // For LINK type resources
+}
+
+export interface ResourceStats {
+    totalResources: number;
+    resourcesByType: { [key: string]: number };
+    resourcesByCategory: { [key: string]: number };
+    resources: ResourceMaterial[];
+    totalFileSize: number;
+    totalFileSizeFormatted: string;
 }
 
 export interface ResourceError {
@@ -45,4 +59,4 @@ export interface ResourceError {
         [key: string]: string;
     };
     timestamp: string;
-} 
+}

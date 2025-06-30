@@ -7,37 +7,43 @@ import {
     DocumentIcon,
     TrashIcon,
     PencilIcon,
-    ArrowUpTrayIcon,
+    ArrowDownTrayIcon,
     XMarkIcon,
     VideoCameraIcon,
     PhotoIcon,
-    LinkIcon
+    LinkIcon,
+    SpeakerWaveIcon,
+    ArchiveBoxIcon,
+    ChartBarIcon,
+    MagnifyingGlassIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import resourceService from '../../api/services/resourceService';
-import { ResourceType, ResourceMaterial } from '../../types/resource';
+import { ResourceType, ResourceMaterial, ResourceStats } from '../../types/resource';
 import type { CreateResourceRequest } from '../../api/services/resourceService';
 import { formatFileSize, formatDate } from '../../utils/formatters';
 import { useAuthStore } from '../../stores/authStore';
 
-
 const PREDEFINED_CATEGORIES = [
-    'Lecture Notes',
-    'Assignments',
-    'Tutorials',
-    'Reference Materials',
-    'Past Papers'
+    'lecture-notes',
+    'assignments',
+    'tutorials',
+    'references',
+    'past-papers',
+    'external'
 ];
 
 export default function LecturerClassResources() {
     const { classId } = useParams<{ classId: string }>();
     const [resources, setResources] = useState<ResourceMaterial[]>([]);
+    const [stats, setStats] = useState<ResourceStats | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [selectedType, setSelectedType] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreating, setIsCreating] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const { user, lecturer } = useAuthStore();
 
@@ -46,25 +52,15 @@ export default function LecturerClassResources() {
         description: '',
         type: ResourceType.DOCUMENT,
         courseSessionId: parseInt(classId!),
-        uploadedBy: lecturer?.id || user?.id || 0,
-        categories: []
+        categories: [],
+        linkUrl: ''
     });
 
     useEffect(() => {
-        if (user?.role === 'LECTURER' && !lecturer) {
-            useAuthStore.getState().getLecturerId().then((lecturerId) => {
-                if (lecturerId) {
-                    setFormData(prev => ({
-                        ...prev,
-                        uploadedBy: lecturerId
-                    }));
-                }
-            });
+        if (classId) {
+            loadResources();
+            loadStats();
         }
-    }, [user, lecturer]);
-
-    useEffect(() => {
-        loadResources();
     }, [classId]);
 
     const loadResources = async () => {
@@ -72,13 +68,22 @@ export default function LecturerClassResources() {
             setIsLoading(true);
             setError(null);
             const data = await resourceService.getResourcesByCourseSession(parseInt(classId!));
-            setResources(data as unknown as ResourceMaterial[]);
+            setResources(data);
         } catch (err) {
             console.error('Failed to load resources:', err);
             setError('Failed to load resources. Please try again later.');
             toast.error('Failed to load resources');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadStats = async () => {
+        try {
+            const statsData = await resourceService.getResourcesStats(parseInt(classId!));
+            setStats(statsData);
+        } catch (err) {
+            console.error('Failed to load stats:', err);
         }
     };
 
@@ -98,13 +103,32 @@ export default function LecturerClassResources() {
                 type = ResourceType.PHOTO;
             } else if (contentType.startsWith('video/')) {
                 type = ResourceType.VIDEO;
+            } else if (contentType.startsWith('audio/')) {
+                type = ResourceType.AUDIO;
+            } else if (contentType.includes('zip') || contentType.includes('rar') || contentType.includes('tar')) {
+                type = ResourceType.ARCHIVE;
             }
             
             setFormData(prev => ({
                 ...prev,
                 type,
-                title: file.name.split('.')[0] // Set default title as filename
+                title: file.name.split('.')[0], // Set default title as filename
+                linkUrl: '' // Clear linkUrl when file is selected
             }));
+        }
+    };
+
+    const handleTypeChange = (newType: ResourceType) => {
+        setFormData(prev => ({
+            ...prev,
+            type: newType
+        }));
+        
+        // Clear file or linkUrl based on type
+        if (newType === ResourceType.LINK) {
+            setSelectedFile(null);
+        } else {
+            setFormData(prev => ({ ...prev, linkUrl: '' }));
         }
     };
 
@@ -112,30 +136,32 @@ export default function LecturerClassResources() {
         e.preventDefault();
         try {
             setIsUploading(true);
-            setUploadProgress(0);
             
-            const submissionData = {
+            const submissionData: CreateResourceRequest = {
                 ...formData,
                 description: formData.description || '',
-                courseSessionId: parseInt(classId!),
-                uploadedBy: lecturer?.id || user?.id || 0
-            } as CreateResourceRequest;
+                courseSessionId: parseInt(classId!)
+            };
             
-            if (!selectedFile && formData.type !== ResourceType.LINK) {
-                toast.error('Please select a file to upload');
-                return;
-            }
-
+            let resource: ResourceMaterial;
+            
             if (formData.type === ResourceType.LINK) {
-                const resource = await resourceService.createLinkResource(formData);
-                setResources([...resources, resource as ResourceMaterial]);
+                if (!formData.linkUrl) {
+                    toast.error('Please enter a valid URL for the link resource');
+                    return;
+                }
+                resource = await resourceService.createLinkResource(submissionData);
                 toast.success('Link resource created successfully');
             } else {
-                const resource = await resourceService.uploadResource(selectedFile!, formData);
-                setResources([...resources, resource as ResourceMaterial]);
+                if (!selectedFile) {
+                    toast.error('Please select a file to upload');
+                    return;
+                }
+                resource = await resourceService.uploadResource(selectedFile, submissionData);
                 toast.success('File resource uploaded successfully');
             }
             
+            setResources([...resources, resource]);
             setIsCreating(false);
             setSelectedFile(null);
             setFormData({
@@ -143,9 +169,12 @@ export default function LecturerClassResources() {
                 description: '',
                 type: ResourceType.DOCUMENT,
                 courseSessionId: parseInt(classId!),
-                uploadedBy: user?.id || 0,
-                categories: []
+                categories: [],
+                linkUrl: ''
             });
+            
+            // Reload stats
+            loadStats();
         } catch (err) {
             console.error('Failed to upload resource:', err);
             setError('Failed to upload resource. Please try again later.');
@@ -155,15 +184,53 @@ export default function LecturerClassResources() {
         }
     };
 
+    const handleDownload = async (resource: ResourceMaterial) => {
+        try {
+            if (resource.type === ResourceType.LINK) {
+                window.open(resource.linkUrl, '_blank');
+                return;
+            }
+
+            // For file resources, use the general download endpoint
+            const blob = await resourceService.downloadResource(resource.id);
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = resource.originalFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            // Record download
+            await resourceService.recordDownload(resource.id);
+            
+            // Update download count locally
+            setResources(resources.map(r => 
+                r.id === resource.id 
+                    ? { ...r, downloadCount: r.downloadCount + 1 }
+                    : r
+            ));
+            
+            toast.success('Download started');
+        } catch (err) {
+            console.error('Failed to download resource:', err);
+            toast.error('Failed to download resource');
+        }
+    };
+
     const handleDelete = async (id: number) => {
         if (!window.confirm('Are you sure you want to delete this resource?')) {
             return;
         }
 
         try {
-            await resourceService.deleteResource(id as number);
+            await resourceService.deleteResource(id);
             toast.success('Resource deleted successfully');
             setResources(resources.filter(r => r.id !== id));
+            loadStats(); // Reload stats
         } catch (err) {
             console.error('Failed to delete resource:', err);
             toast.error('Failed to delete resource');
@@ -174,11 +241,12 @@ export default function LecturerClassResources() {
         const matchesCategory = selectedCategory === 'all' || resource.categories.some(category =>
             category.toLowerCase() === selectedCategory.toLowerCase()
         );
+        const matchesType = selectedType === 'all' || resource.type === selectedType;
         const matchesSearch = 
             resource.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             resource.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             false;
-        return matchesCategory && matchesSearch;
+        return matchesCategory && matchesType && matchesSearch;
     });
 
     const getResourceIcon = (type: ResourceType) => {
@@ -191,24 +259,36 @@ export default function LecturerClassResources() {
                 return <PhotoIcon className="h-8 w-8 text-green-500" />;
             case ResourceType.LINK:
                 return <LinkIcon className="h-8 w-8 text-purple-500" />;
-            case ResourceType.FOLDER:
-                return <FolderIcon className="h-8 w-8 text-yellow-500" />;
+            case ResourceType.AUDIO:
+                return <SpeakerWaveIcon className="h-8 w-8 text-orange-500" />;
+            case ResourceType.ARCHIVE:
+                return <ArchiveBoxIcon className="h-8 w-8 text-gray-500" />;
             default:
-                return null;
+                return <DocumentIcon className="h-8 w-8 text-blue-500" />;
         }
     };
 
     if (isLoading) {
-        return <div className="flex justify-center items-center h-64">Loading resources...</div>;
+        return (
+            <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+        );
     }
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-gray-900">Class Resources</h2>
+                <div>
+                    <h2 className="heading-3">Class Resources</h2>
+                    <p className="body-default text-foreground-secondary mt-1">
+                        Manage and share course materials with students
+                    </p>
+                </div>
                 <button
                     onClick={() => setIsCreating(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                    className="btn btn-primary"
                     disabled={isUploading}
                 >
                     <PlusIcon className="h-5 w-5 mr-2" />
@@ -216,87 +296,135 @@ export default function LecturerClassResources() {
                 </button>
             </div>
 
-            {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
-                    {error}
+            {/* Stats Cards */}
+            {stats && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="card text-center">
+                        <ChartBarIcon className="h-8 w-8 text-primary-500 mx-auto mb-2" />
+                        <div className="heading-4 text-primary-600">{stats.totalResources}</div>
+                        <div className="body-small text-foreground-secondary">Total Resources</div>
+                    </div>
+                    <div className="card text-center">
+                        <DocumentIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                        <div className="heading-4 text-blue-600">{stats.resourcesByType.DOCUMENT || 0}</div>
+                        <div className="body-small text-foreground-secondary">Documents</div>
+                    </div>
+                    <div className="card text-center">
+                        <VideoCameraIcon className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <div className="heading-4 text-red-600">{stats.resourcesByType.VIDEO || 0}</div>
+                        <div className="body-small text-foreground-secondary">Videos</div>
+                    </div>
+                    <div className="card text-center">
+                        <ArchiveBoxIcon className="h-8 w-8 text-gray-500 mx-auto mb-2" />
+                        <div className="heading-4 text-gray-600">{stats.totalFileSizeFormatted}</div>
+                        <div className="body-small text-foreground-secondary">Total Size</div>
+                    </div>
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4">
-                <input
-                    type="text"
-                    placeholder="Search resources..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-full pl-4 pr-12 py-2 text-sm border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
-                />
-                <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                    <option value="all">All Categories</option>
-                    {PREDEFINED_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                </select>
+            {error && (
+                <div className="status-error p-4 rounded-lg">
+                    <div className="flex items-center">
+                        <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+                        <p className="body-default">{error}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Filters */}
+            <div className="card">
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                        <input
+                            type="text"
+                            placeholder="Search resources..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="input pl-10"
+                        />
+                        <MagnifyingGlassIcon className="h-5 w-5 text-foreground-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
+                    </div>
+                    <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="input min-w-[150px]"
+                    >
+                        <option value="all">All Categories</option>
+                        {PREDEFINED_CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat}>{cat.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className="input min-w-[130px]"
+                    >
+                        <option value="all">All Types</option>
+                        {Object.values(ResourceType).map((type) => (
+                            <option key={type} value={type}>{type}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
+            {/* Create Resource Form */}
             {isCreating && (
-                <div className="bg-white shadow rounded-lg p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-medium text-gray-900">Add New Resource</h3>
+                <div className="card">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="heading-4">Add New Resource</h3>
                         <button
                             onClick={() => setIsCreating(false)}
-                            className="text-gray-400 hover:text-gray-500"
+                            className="text-foreground-secondary hover:text-foreground"
                         >
-                            <XMarkIcon className="h-5 w-5" />
+                            <XMarkIcon className="h-6 w-6" />
                         </button>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Resource Type
-                            </label>
-                            <select
-                                value={formData.type}
-                                onChange={(e) => setFormData({...formData, type: e.target.value as ResourceType})}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                            >
-                                {Object.values(ResourceType).map((type) => (
-                                    <option key={type} value={type}>{type}</option>
-                                ))}
-                            </select>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Resource Type
+                                </label>
+                                <select
+                                    value={formData.type}
+                                    onChange={(e) => handleTypeChange(e.target.value as ResourceType)}
+                                    className="input"
+                                >
+                                    {Object.values(ResourceType).map((type) => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    Title
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                    className="input"
+                                    required
+                                />
+                            </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">
-                                Title
-                            </label>
-                            <input
-                                type="text"
-                                value={formData.title}
-                                onChange={(e) => setFormData({...formData, title: e.target.value})}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-foreground mb-2">
                                 Description
                             </label>
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => setFormData({...formData, description: e.target.value})}
                                 rows={3}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                                className="input"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-foreground mb-2">
                                 Categories
                             </label>
                             <select
@@ -306,35 +434,56 @@ export default function LecturerClassResources() {
                                     ...formData,
                                     categories: Array.from(e.target.selectedOptions, option => option.value)
                                 })}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                                className="input"
+                                size={4}
                                 required
                             >
                                 {PREDEFINED_CATEGORIES.map((category) => (
                                     <option key={category} value={category}>
-                                        {category}
+                                        {category.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                     </option>
                                 ))}
                             </select>
+                            <p className="text-sm text-foreground-secondary mt-1">
+                                Hold Ctrl/Cmd to select multiple categories
+                            </p>
                         </div>
 
-                        {formData.type !== ResourceType.LINK && (
+                        {formData.type === ResourceType.LINK ? (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className="block text-sm font-medium text-foreground mb-2">
+                                    URL
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.linkUrl}
+                                    onChange={(e) => setFormData({...formData, linkUrl: e.target.value})}
+                                    className="input"
+                                    placeholder="https://example.com"
+                                    required
+                                />
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="block text-sm font-medium text-foreground mb-2">
                                     File
                                 </label>
                                 <input
                                     type="file"
                                     onChange={handleFileChange}
-                                    className="mt-1 block w-full"
+                                    className="input"
                                     accept={
                                         formData.type === ResourceType.PHOTO ? "image/*" :
                                         formData.type === ResourceType.VIDEO ? "video/*" :
-                                        formData.type === ResourceType.DOCUMENT ? ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx" :
+                                        formData.type === ResourceType.AUDIO ? "audio/*" :
+                                        formData.type === ResourceType.ARCHIVE ? ".zip,.rar,.tar,.gz,.7z" :
+                                        formData.type === ResourceType.DOCUMENT ? ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt" :
                                         undefined
                                     }
+                                    required
                                 />
                                 {selectedFile && (
-                                    <p className="mt-2 text-sm text-gray-500">
+                                    <p className="mt-2 text-sm text-foreground-secondary">
                                         Selected file: {selectedFile.name} ({formatFileSize(selectedFile.size)})
                                     </p>
                                 )}
@@ -345,14 +494,14 @@ export default function LecturerClassResources() {
                             <button
                                 type="button"
                                 onClick={() => setIsCreating(false)}
-                                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                className="btn btn-secondary"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={isUploading}
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
+                                className="btn btn-primary"
                             >
                                 {isUploading ? 'Uploading...' : 'Upload'}
                             </button>
@@ -361,64 +510,116 @@ export default function LecturerClassResources() {
                 </div>
             )}
 
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            {/* Resources List */}
+            <div className="card overflow-hidden">
                 {filteredResources.length === 0 ? (
                     <div className="text-center py-12">
-                        <p className="text-gray-500">No resources found</p>
+                        <FolderIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+                        <h3 className="heading-4 mb-2">No Resources Found</h3>
+                        <p className="body-default text-foreground-secondary">
+                            {searchQuery || selectedCategory !== 'all' || selectedType !== 'all'
+                                ? "No resources match your current filters."
+                                : "Start by adding your first resource to this course."
+                            }
+                        </p>
                     </div>
                 ) : (
-                    <ul className="divide-y divide-gray-200">
-                        {filteredResources.map((resource) => (
-                            <li key={resource.id} className="px-4 py-4 hover:bg-gray-50">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        {getResourceIcon(resource.type)}
-                                        <div className="ml-4">
-                                            <h4 className="text-lg font-medium text-gray-900">
-                                                {resource.title}
-                                            </h4>
-                                            {resource.description && (
-                                                <p className="mt-1 text-sm text-gray-500">
-                                                    {resource.description}
-                                                </p>
-                                            )}
-                                            <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-border">
+                            <thead className="bg-background-secondary">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Resource
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Type
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Categories
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Size
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Downloads
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Uploaded
+                                    </th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-foreground-secondary uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-background divide-y divide-border">
+                                {filteredResources.map((resource) => (
+                                    <tr key={resource.id} className="hover:bg-background-secondary">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center">
+                                                {getResourceIcon(resource.type)}
+                                                <div className="ml-4">
+                                                    <div className="body-default font-medium text-foreground">
+                                                        {resource.title}
+                                                    </div>
+                                                    {resource.description && (
+                                                        <div className="body-small text-foreground-secondary">
+                                                            {resource.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
+                                                {resource.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-wrap gap-1">
                                                 {resource.categories.map((category) => (
                                                     <span
                                                         key={category}
-                                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                                        className="px-2 py-1 text-xs font-medium rounded-full bg-background-tertiary text-foreground-secondary"
                                                     >
-                                                        {category}
+                                                        {category.replace('-', ' ')}
                                                     </span>
                                                 ))}
                                             </div>
-                                            <div className="mt-2 flex items-center text-sm text-gray-500 space-x-4">
-                                                <span>{formatFileSize(resource.fileSize)}</span>
-                                                <span>{formatDate(resource.uploadedAt)}</span>
-                                                <span>{resource.downloadCount} downloads</span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap body-small text-foreground-secondary">
+                                            {resource.fileSizeFormatted}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap body-small text-foreground-secondary">
+                                            {resource.downloadCount}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap body-small text-foreground-secondary">
+                                            {formatDate(resource.uploadedAt)}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex items-center justify-end space-x-2">
+                                                <button
+                                                    onClick={() => handleDownload(resource)}
+                                                    className="text-primary-600 hover:text-primary-700"
+                                                    title="Download"
+                                                >
+                                                    <ArrowDownTrayIcon className="h-5 w-5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(resource.id)}
+                                                    className="text-error-600 hover:text-error-700"
+                                                    title="Delete"
+                                                >
+                                                    <TrashIcon className="h-5 w-5" />
+                                                </button>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => window.open(resource.fileUrl, '_blank')}
-                                            className="text-gray-400 hover:text-gray-500"
-                                        >
-                                            <ArrowUpTrayIcon className="h-5 w-5" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(resource.id)}
-                                            className="text-gray-400 hover:text-red-500"
-                                        >
-                                            <TrashIcon className="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 )}
             </div>
         </div>
     );
-} 
+}
