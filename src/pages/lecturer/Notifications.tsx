@@ -1,368 +1,428 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  PlusIcon,
+  MegaphoneIcon,
   BellIcon,
+  InformationCircleIcon,
+  ExclamationTriangleIcon,
+  PlusIcon,
   TrashIcon,
-  PencilIcon,
   ClockIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
   CheckCircleIcon,
+  CalendarIcon,
+  AcademicCapIcon,
 } from "@heroicons/react/24/outline";
+import { notificationService, Notification, CreateNotificationRequest } from "../../api/services/notificationService";
+import { useAuthStore } from "../../stores/authStore";
+import toast from "react-hot-toast";
+import api from "../../api/config";
 
-interface Notification {
-  id: string;
-  title: string;
-  content: string;
-  type: "info" | "warning" | "success" | "urgent";
-  date: string;
-  author: string;
-  isPinned: boolean;
-  attachments?: {
-    name: string;
-    url: string;
-    type: string;
-  }[];
+interface CourseSession {
+  id: number;
+  courseCode: string;
+  courseName: string;
 }
 
-// Mock data - replace with actual API calls
-const mockNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "Class Schedule Update",
-    content:
-      "Due to the upcoming holiday, we will have a make-up class next week. Please check the updated schedule.",
-    type: "info",
-    date: "2024-03-15T10:30:00",
-    author: "Dr. Sarah Wilson",
-    isPinned: true,
+const notificationTypeConfig = {
+  deadline: {
+    icon: CalendarIcon,
+    color: "text-warning-600",
+    bgColor: "bg-warning-50 dark:bg-warning-900/20",
+    borderColor: "border-warning-200 dark:border-warning-800",
+    label: "Deadline"
   },
-  {
-    id: "2",
-    title: "Assignment Deadline Reminder",
-    content:
-      "The deadline for submitting your first programming assignment is approaching. Please ensure you submit it before the due date.",
-    type: "warning",
-    date: "2024-03-14T15:45:00",
-    author: "Dr. Sarah Wilson",
-    isPinned: false,
+  general: {
+    icon: InformationCircleIcon,
+    color: "text-blue-600",
+    bgColor: "bg-blue-50 dark:bg-blue-900/20",
+    borderColor: "border-blue-200 dark:border-blue-800",
+    label: "General"
   },
-  {
-    id: "3",
-    title: "Project Guidelines Available",
-    content:
-      "The guidelines for the final project have been uploaded. Please review them and start working on your proposals.",
-    type: "success",
-    date: "2024-03-13T08:20:00",
-    author: "Dr. Sarah Wilson",
-    isPinned: false,
-    attachments: [
-      {
-        name: "ProjectGuidelines.pdf",
-        url: "/mock-url/project-guidelines.pdf",
-        type: "pdf",
-      },
-    ],
+  grade: {
+    icon: AcademicCapIcon,
+    color: "text-success-600",
+    bgColor: "bg-success-50 dark:bg-success-900/20",
+    borderColor: "border-success-200 dark:border-success-800",
+    label: "Grade"
   },
-];
-
-const notificationTypes = [
-  { id: "info", name: "Information", color: "bg-blue-100 text-blue-800" },
-  { id: "warning", name: "Warning", color: "bg-yellow-100 text-yellow-800" },
-  { id: "success", name: "Success", color: "bg-green-100 text-green-800" },
-  { id: "urgent", name: "Urgent", color: "bg-red-100 text-red-800" },
-];
+  announcement: {
+    icon: MegaphoneIcon,
+    color: "text-purple-600",
+    bgColor: "bg-purple-50 dark:bg-purple-900/20",
+    borderColor: "border-purple-200 dark:border-purple-800",
+    label: "Announcement"
+  }
+};
 
 export default function LecturerNotifications() {
-  const [notifications, setNotifications] =
-    useState<Notification[]>(mockNotifications);
+  const { user, lecturer } = useAuthStore();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [courseSessions, setCourseSessions] = useState<CourseSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState<"all" | "deadline" | "general" | "grade" | "announcement">("all");
   const [isCreating, setIsCreating] = useState(false);
-  const [newNotification, setNewNotification] = useState({
-    title: "",
-    content: "",
-    type: "info" as const,
-    isPinned: false,
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newNotification, setNewNotification] = useState<CreateNotificationRequest>({
+    subject: "",
+    message: "",
+    type: "general",
+    courseSessionId: 0
   });
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const filteredNotifications = notifications.filter(
-    (notification) =>
-      notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      notification.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    fetchNotifications();
+    fetchCourseSessions();
+  }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await notificationService.getMyNotifications();
+      setNotifications(data);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError('Failed to load notifications. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchCourseSessions = async () => {
+    try {
+      if (!lecturer?.id) {
+        console.warn('Lecturer ID not available');
+        return;
+      }
+
+      // Get course sessions for this lecturer
+      const response = await api.get(`/api/course-sessions/department/${lecturer.id}`);
+      
+      // Filter course sessions assigned to this lecturer
+      const lecturerSessions = response.data.filter((session: any) => 
+        session.lecturerIds && session.lecturerIds.includes(lecturer.id)
+      );
+
+      // Map to simpler format
+      const sessions = lecturerSessions.map((session: any) => ({
+        id: session.id,
+        courseCode: session.course.code,
+        courseName: session.course.name
+      }));
+
+      setCourseSessions(sessions);
+      
+      // Set default course session if available
+      if (sessions.length > 0 && newNotification.courseSessionId === 0) {
+        setNewNotification(prev => ({ ...prev, courseSessionId: sessions[0].id }));
+      }
+    } catch (err) {
+      console.error('Error fetching course sessions:', err);
+    }
+  };
+
+  const handleCreateNotification = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle notification creation with file upload
-    setIsCreating(false);
-    setNewNotification({
-      title: "",
-      content: "",
-      type: "info",
-      isPinned: false,
+    
+    if (!newNotification.subject.trim() || !newNotification.message.trim() || newNotification.courseSessionId === 0) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const createdNotification = await notificationService.createNotification(newNotification);
+      setNotifications([createdNotification, ...notifications]);
+      setIsCreating(false);
+      setNewNotification({
+        subject: "",
+        message: "",
+        type: "general",
+        courseSessionId: courseSessions.length > 0 ? courseSessions[0].id : 0
+      });
+      toast.success('Notification created successfully');
+    } catch (err) {
+      console.error('Error creating notification:', err);
+      toast.error('Failed to create notification');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteNotification = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this notification?')) {
+      return;
+    }
+
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications(notifications.filter(n => n.id !== id));
+      toast.success('Notification deleted successfully');
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      toast.error('Failed to delete notification');
+    }
+  };
+
+  const filteredNotifications = notifications.filter(notification => {
+    const matchesType = selectedType === "all" || notification.type === selectedType;
+    const matchesSearch = 
+      notification.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      notification.message.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
-    setSelectedFiles([]);
   };
 
-  const handleDelete = (id: string) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
-  };
-
-  const togglePin = (id: string) => {
-    setNotifications(
-      notifications.map((n) =>
-        n.id === id ? { ...n, isPinned: !n.isPinned } : n
-      )
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">
-          Class Notifications
-        </h2>
+        <div>
+          <h2 className="heading-3 flex items-center">
+            <BellIcon className="h-6 w-6 mr-2 text-primary-500" />
+            Manage Notifications
+          </h2>
+          <p className="body-default text-foreground-secondary mt-1">
+            Create and manage notifications for your students
+          </p>
+        </div>
         <button
           onClick={() => setIsCreating(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          className="btn btn-primary"
         >
           <PlusIcon className="h-5 w-5 mr-2" />
           Create Notification
         </button>
       </div>
 
-      {/* Search */}
-      <div className="flex-1">
-        <input
-          type="text"
-          placeholder="Search notifications..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-        />
-      </div>
-
       {/* Create Notification Form */}
       {isCreating && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            Create New Notification
-          </h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="card">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="heading-4">Create New Notification</h3>
+            <button
+              onClick={() => setIsCreating(false)}
+              className="text-foreground-secondary hover:text-foreground"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
+
+          <form onSubmit={handleCreateNotification} className="space-y-6">
             <div>
-              <label
-                htmlFor="title"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Title
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Subject *
               </label>
               <input
                 type="text"
-                id="title"
-                value={newNotification.title}
-                onChange={(e) =>
-                  setNewNotification({
-                    ...newNotification,
-                    title: e.target.value,
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                value={newNotification.subject}
+                onChange={(e) => setNewNotification({ ...newNotification, subject: e.target.value })}
+                className="input"
+                placeholder="Enter notification subject"
                 required
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Type *
+                </label>
+                <select
+                  value={newNotification.type}
+                  onChange={(e) => setNewNotification({ ...newNotification, type: e.target.value as "deadline" | "general" | "grade" | "announcement" })}
+                  className="input"
+                >
+                  <option value="general">General</option>
+                  <option value="deadline">Deadline</option>
+                  <option value="grade">Grade</option>
+                  <option value="announcement">Announcement</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Course *
+                </label>
+                <select
+                  value={newNotification.courseSessionId}
+                  onChange={(e) => setNewNotification({ ...newNotification, courseSessionId: parseInt(e.target.value) })}
+                  className="input"
+                  required
+                >
+                  <option value="">Select a course</option>
+                  {courseSessions.map(course => (
+                    <option key={course.id} value={course.id}>
+                      {course.courseCode} - {course.courseName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label
-                htmlFor="content"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Content
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Message *
               </label>
               <textarea
-                id="content"
-                rows={4}
-                value={newNotification.content}
-                onChange={(e) =>
-                  setNewNotification({
-                    ...newNotification,
-                    content: e.target.value,
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                value={newNotification.message}
+                onChange={(e) => setNewNotification({ ...newNotification, message: e.target.value })}
+                rows={6}
+                className="input"
+                placeholder="Enter notification message"
                 required
               />
-            </div>
-
-            <div>
-              <label
-                htmlFor="type"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Type
-              </label>
-              <select
-                id="type"
-                value={newNotification.type}
-                onChange={(e) =>
-                  setNewNotification({
-                    ...newNotification,
-                    type: e.target.value as
-                      | "info"
-                      | "warning"
-                      | "success"
-                      | "urgent",
-                  })
-                }
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              >
-                {notificationTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isPinned"
-                checked={newNotification.isPinned}
-                onChange={(e) =>
-                  setNewNotification({
-                    ...newNotification,
-                    isPinned: e.target.checked,
-                  })
-                }
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="isPinned"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                Pin this notification
-              </label>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Attachments
-              </label>
-              <div className="mt-1 flex items-center">
-                <input
-                  type="file"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  <PlusIcon className="h-5 w-5 mr-2" />
-                  Add Attachments
-                </label>
-                {selectedFiles.length > 0 && (
-                  <span className="ml-2 text-sm text-gray-500">
-                    {selectedFiles.length} file(s) selected
-                  </span>
-                )}
-              </div>
             </div>
 
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                disabled={isSubmitting}
+                className="btn btn-primary"
               >
-                Create Notification
+                {isSubmitting ? 'Creating...' : 'Create Notification'}
               </button>
             </div>
           </form>
         </div>
       )}
 
+      {/* Filters */}
+      <div className="card">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-10"
+            />
+            <MagnifyingGlassIcon className="h-5 w-5 text-foreground-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
+          </div>
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value as "all" | "deadline" | "general" | "grade" | "announcement")}
+            className="input min-w-[150px]"
+          >
+            <option value="all">All Types</option>
+            <option value="general">General</option>
+            <option value="deadline">Deadline</option>
+            <option value="grade">Grade</option>
+            <option value="announcement">Announcement</option>
+          </select>
+        </div>
+      </div>
+
+      {error && (
+        <div className="status-error p-4 rounded-lg">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-5 w-5 mr-2" />
+            <p className="body-default">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Notifications List */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <ul className="divide-y divide-gray-200">
-          {filteredNotifications.map((notification) => (
-            <li key={notification.id}>
-              <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div
-                      className={`p-2 rounded-full ${
-                        notificationTypes.find(
-                          (t) => t.id === notification.type
-                        )?.color
-                      }`}
-                    >
-                      <BellIcon className="h-5 w-5" />
+      {filteredNotifications.length === 0 ? (
+        <div className="card text-center py-12">
+          <BellIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
+          <h3 className="heading-4 mb-2">No Notifications Found</h3>
+          <p className="body-default text-foreground-secondary">
+            {searchQuery || selectedType !== "all"
+              ? "No notifications match your current filters."
+              : "You haven't created any notifications yet."
+            }
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredNotifications.map((notification) => {
+            const config = notificationTypeConfig[notification.type] || notificationTypeConfig.general;
+            const IconComponent = config.icon;
+            
+            // Find course name
+            const course = courseSessions.find(c => c.id === notification.courseSessionId);
+            
+            return (
+              <div key={notification.id} className="card">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div className={`p-3 rounded-lg ${config.bgColor}`}>
+                      <IconComponent className={`h-6 w-6 ${config.color}`} />
                     </div>
-                    <div className="ml-4">
-                      <div className="flex items-center">
-                        <h3 className="text-sm font-medium text-gray-900">
-                          {notification.title}
-                        </h3>
-                        {notification.isPinned && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Pinned
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        {notification.content}
+                    
+                    <div className="flex-1 min-w-0">
+                      <h3 className="heading-4 mb-2">{notification.subject}</h3>
+                      <p className="body-default text-foreground-secondary mb-4">
+                        {notification.message}
                       </p>
-                      <div className="mt-1 flex items-center text-xs text-gray-500">
-                        <ClockIcon className="h-4 w-4 mr-1" />
-                        {new Date(notification.date).toLocaleString()}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center text-foreground-tertiary">
+                          <ClockIcon className="h-4 w-4 mr-1" />
+                          <span className="body-small">
+                            {formatDate(notification.createdAt)}
+                          </span>
+                          {course && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span className="body-small">{course.courseCode}</span>
+                            </>
+                          )}
+                        </div>
+                        
+                        <span className={`
+                          px-3 py-1 rounded-full text-sm font-medium
+                          ${config.bgColor} ${config.color}
+                        `}>
+                          {config.label}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => togglePin(notification.id)}
-                      className={`text-gray-400 hover:text-yellow-500 ${
-                        notification.isPinned ? "text-yellow-500" : ""
-                      }`}
-                    >
-                      <CheckCircleIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Handle edit
-                      }}
-                      className="text-gray-400 hover:text-gray-500"
-                    >
-                      <PencilIcon className="h-5 w-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(notification.id)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </div>
+                  
+                  <button
+                    onClick={() => handleDeleteNotification(notification.id)}
+                    className="text-foreground-secondary hover:text-error-600 transition-colors p-2"
+                    title="Delete notification"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

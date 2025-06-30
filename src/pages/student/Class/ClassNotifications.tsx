@@ -5,46 +5,45 @@ import {
   CheckCircleIcon, 
   ClockIcon,
   ExclamationTriangleIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  MagnifyingGlassIcon,
+  EyeIcon,
+  CalendarIcon,
+  AcademicCapIcon,
+  MegaphoneIcon
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../../stores/authStore";
-import api from "../../../api/config";
-
-interface Notification {
-  id: string;
-  subject: string;
-  message: string;
-  type: "deadline" | "general" | "grade" | "announcement";
-  createdAt: string;
-  isRead: boolean;
-  courseSessionId: number;
-  lecturerName: string;
-}
+import { notificationService, Notification } from "../../../api/services/notificationService";
+import toast from "react-hot-toast";
 
 const notificationTypeConfig = {
   deadline: {
-    icon: ClockIcon,
+    icon: CalendarIcon,
     color: "text-warning-600",
     bgColor: "bg-warning-50 dark:bg-warning-900/20",
-    borderColor: "border-warning-200 dark:border-warning-800"
+    borderColor: "border-warning-200 dark:border-warning-800",
+    label: "Deadline"
   },
   general: {
     icon: InformationCircleIcon,
-    color: "text-primary-600",
-    bgColor: "bg-primary-50 dark:bg-primary-900/20",
-    borderColor: "border-primary-200 dark:border-primary-800"
-  },
-  grade: {
-    icon: CheckCircleIcon,
-    color: "text-success-600",
-    bgColor: "bg-success-50 dark:bg-success-900/20",
-    borderColor: "border-success-200 dark:border-success-800"
-  },
-  announcement: {
-    icon: BellIcon,
     color: "text-blue-600",
     bgColor: "bg-blue-50 dark:bg-blue-900/20",
-    borderColor: "border-blue-200 dark:border-blue-800"
+    borderColor: "border-blue-200 dark:border-blue-800",
+    label: "General"
+  },
+  grade: {
+    icon: AcademicCapIcon,
+    color: "text-success-600",
+    bgColor: "bg-success-50 dark:bg-success-900/20",
+    borderColor: "border-success-200 dark:border-success-800",
+    label: "Grade"
+  },
+  announcement: {
+    icon: MegaphoneIcon,
+    color: "text-purple-600",
+    bgColor: "bg-purple-50 dark:bg-purple-900/20",
+    borderColor: "border-purple-200 dark:border-purple-800",
+    label: "Announcement"
   }
 };
 
@@ -55,84 +54,86 @@ export default function ClassNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState<"all" | "deadline" | "general" | "grade" | "announcement">("all");
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch notifications for the student
-        const response = await api.get('/api/com/notifications/student');
-        
-        // Validate response data
-        if (!response.data) {
-          console.warn('No data received from notifications API');
-          setNotifications([]);
-          return;
-        }
-
-        // Ensure response.data is an array
-        const notificationsData = Array.isArray(response.data) ? response.data : [];
-        
-        if (notificationsData.length === 0) {
-          setNotifications([]);
-          return;
-        }
-
-        // Filter notifications for this specific course session
-        const courseNotifications = notificationsData.filter(
-          (notification: any) => {
-            // Handle both string and number courseSessionId
-            const notificationCourseId = typeof notification.courseSessionId === 'string' 
-              ? parseInt(notification.courseSessionId) 
-              : notification.courseSessionId;
-            const currentClassId = parseInt(ClassId!);
-            
-            return notificationCourseId === currentClassId;
-          }
-        );
-
-        setNotifications(courseNotifications);
-      } catch (err: any) {
-        console.error('Error fetching notifications:', err);
-        
-        // More specific error handling
-        if (err.response?.status === 404) {
-          setError("No notifications found for this course.");
-        } else if (err.response?.status === 403) {
-          setError("You don't have permission to view notifications for this course.");
-        } else {
-          setError("Failed to load notifications. Please try again later.");
-        }
-        
-        // Set empty array on error to prevent further issues
-        setNotifications([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (ClassId && user?.id) {
+    if (ClassId) {
       fetchNotifications();
     }
-  }, [ClassId, user?.id]);
+  }, [ClassId]);
 
-  const markAsRead = async (notificationId: string) => {
+  const fetchNotifications = async () => {
     try {
-      await api.post(`/api/com/notifications/${notificationId}/mark-read`);
+      setLoading(true);
+      setError(null);
+
+      if (!ClassId || !user?.id) {
+        setError("Missing required information to load notifications.");
+        return;
+      }
+
+      // Fetch notifications for this course session
+      const courseNotifications = await notificationService.getNotificationsByCourseSession(parseInt(ClassId));
+      setNotifications(courseNotifications);
       
-      setNotifications(notifications.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, isRead: true }
-          : notification
-      ));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
+      // Count unread notifications
+      const unreadNotifications = courseNotifications.filter(notification => !notification.isRead);
+      setUnreadCount(unreadNotifications.length);
+
+    } catch (err: any) {
+      console.error('Error fetching notifications:', err);
+      
+      if (err.response?.status === 404) {
+        setError("No notifications found for this course.");
+      } else {
+        setError("Failed to load notifications. Please try again later.");
+      }
+      
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const handleMarkAsRead = async (notification: Notification) => {
+    if (notification.isRead) return;
+
+    try {
+      await notificationService.markNotificationAsRead(notification.id);
+      setNotifications(notifications.map(n => 
+        n.id === notification.id ? { ...n, isRead: true } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      toast.success('Marked as read');
+    } catch (err) {
+      console.error('Error marking as read:', err);
+      toast.error('Failed to mark as read');
+    }
+  };
+
+  const filteredNotifications = notifications.filter(notification => {
+    const matchesType = selectedType === "all" || notification.type === selectedType;
+    const matchesSearch = 
+      notification.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      notification.message.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesType && matchesSearch;
+  });
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffInHours < 168) { // 7 days
+      return date.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  };
 
   if (loading) {
     return (
@@ -158,6 +159,33 @@ export default function ClassNotifications() {
         <div className="text-right">
           <div className="body-small text-foreground-secondary">Unread</div>
           <div className="heading-4 text-primary-600">{unreadCount}</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Search notifications..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-10"
+            />
+            <MagnifyingGlassIcon className="h-5 w-5 text-foreground-tertiary absolute left-3 top-1/2 transform -translate-y-1/2" />
+          </div>
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value as "all" | "deadline" | "general" | "grade" | "announcement")}
+            className="input min-w-[150px]"
+          >
+            <option value="all">All Types</option>
+            <option value="general">General</option>
+            <option value="deadline">Deadline</option>
+            <option value="grade">Grade</option>
+            <option value="announcement">Announcement</option>
+          </select>
         </div>
       </div>
 
@@ -188,17 +216,20 @@ export default function ClassNotifications() {
       )}
 
       {/* Notifications List */}
-      {notifications.length === 0 ? (
+      {filteredNotifications.length === 0 ? (
         <div className="card text-center py-12">
           <BellIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
           <h3 className="heading-4 mb-2">No Notifications</h3>
           <p className="body-default text-foreground-secondary">
-            {error ? "Unable to load notifications at this time." : "You're all caught up! New notifications will appear here."}
+            {searchQuery || selectedType !== "all"
+              ? "No notifications match your current filters."
+              : "You're all caught up! New notifications will appear here."
+            }
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {notifications.map((notification) => {
+          {filteredNotifications.map((notification) => {
             const config = notificationTypeConfig[notification.type] || notificationTypeConfig.general;
             const IconComponent = config.icon;
             
@@ -212,7 +243,7 @@ export default function ClassNotifications() {
                     : 'hover:bg-background-secondary'
                   }
                 `}
-                onClick={() => !notification.isRead && markAsRead(notification.id)}
+                onClick={() => handleMarkAsRead(notification)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4 flex-1">
@@ -237,17 +268,12 @@ export default function ClassNotifications() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center text-foreground-tertiary">
                           <span className="body-small">
-                            From: {notification.lecturerName || 'System'}
+                            From: {notification.lecturerName}
                           </span>
                           <span className="mx-2">•</span>
+                          <ClockIcon className="h-4 w-4 mr-1" />
                           <span className="body-small">
-                            {new Date(notification.createdAt).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                            {formatDate(notification.createdAt)}
                           </span>
                         </div>
                         
@@ -255,7 +281,7 @@ export default function ClassNotifications() {
                           px-2 py-1 rounded-full text-xs font-medium capitalize
                           ${config.bgColor} ${config.color}
                         `}>
-                          {notification.type}
+                          {config.label}
                         </span>
                       </div>
                     </div>
@@ -265,11 +291,12 @@ export default function ClassNotifications() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        markAsRead(notification.id);
+                        handleMarkAsRead(notification);
                       }}
                       className="btn btn-ghost text-xs px-3 py-1 ml-4"
+                      title="Mark as read"
                     >
-                      Mark as read
+                      <EyeIcon className="h-4 w-4" />
                     </button>
                   )}
                 </div>

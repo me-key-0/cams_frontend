@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   HomeIcon,
   MegaphoneIcon,
@@ -10,9 +10,12 @@ import {
   ChatBubbleLeftRightIcon,
   Bars3Icon,
   XMarkIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../stores/authStore";
 import { ThemeSwitcher } from "../theme/ThemeSwitcher";
+import { notificationService } from "../../api/services/notificationService";
+import { communicationService } from "../../api/services/communicationService";
 
 const studentNavigation = [
   { name: "Dashboard", href: "/student", icon: HomeIcon },
@@ -20,6 +23,7 @@ const studentNavigation = [
     name: "Announcements",
     href: "/student/announcements",
     icon: MegaphoneIcon,
+    hasNotifications: true,
   },
   { name: "Grades", href: "/student/grades", icon: AcademicCapIcon },
   {
@@ -45,6 +49,11 @@ const lecturerNavigation = [
   },
   { name: "Classes", href: "/lecturer/classes", icon: BookOpenIcon },
   {
+    name: "Notifications",
+    href: "/lecturer/notifications",
+    icon: BellIcon,
+  },
+  {
     name: "Contact Admin",
     href: "/lecturer/contact-admin",
     icon: ChatBubbleLeftRightIcon,
@@ -54,12 +63,30 @@ const lecturerNavigation = [
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, clearToken } = useAuthStore();
+  const [unreadAnnouncements, setUnreadAnnouncements] = useState(0);
 
   const navigation =
     user?.role.toLowerCase() === "lecturer" ? lecturerNavigation : studentNavigation;
 
   const currentPage = navigation.find((item) => item.href === location.pathname);
+
+  useEffect(() => {
+    // Fetch unread counts for student
+    if (user?.role.toLowerCase() === "student") {
+      fetchUnreadCounts();
+    }
+  }, [user?.role, location.pathname]);
+
+  const fetchUnreadCounts = async () => {
+    try {
+      const count = await communicationService.getUnreadAnnouncementCount();
+      setUnreadAnnouncements(count);
+    } catch (err) {
+      console.error('Error fetching unread counts:', err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,7 +129,12 @@ export default function Layout() {
                       : "text-foreground-tertiary group-hover:text-foreground-secondary"
                   }`}
                 />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {item.name === "Announcements" && unreadAnnouncements > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-primary-600 rounded-full">
+                    {unreadAnnouncements}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
@@ -145,7 +177,12 @@ export default function Layout() {
                       : "text-foreground-tertiary group-hover:text-foreground-secondary"
                   }`}
                 />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {item.name === "Announcements" && unreadAnnouncements > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-primary-600 rounded-full">
+                    {unreadAnnouncements}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
