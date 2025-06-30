@@ -9,56 +9,13 @@ import {
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
   PaperClipIcon,
+  PaperAirplaneIcon,
+  XMarkIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 import { useAuthStore } from "../../../stores/authStore";
-import api from "../../../api/config";
-
-interface Assessment {
-  id: number;
-  title: string;
-  description: string;
-  type: "INDIVIDUAL" | "GROUP";
-  dueDate: string;
-  createdAt: string;
-  maxScore: number;
-  status: "DRAFT" | "PUBLISHED";
-  lecturerName: string;
-  attachments: Array<{
-    id: number;
-    title: string;
-    fileName: string;
-    downloadUrl: string;
-  }>;
-  submissionCount: number;
-  isOverdue: boolean;
-  mySubmission?: {
-    id: number;
-    content: string;
-    submittedAt: string;
-    status: "SUBMITTED" | "GRADED";
-    score?: number;
-    feedback?: string;
-    isLate: boolean;
-    attachments: Array<{
-      id: number;
-      title: string;
-      fileName: string;
-      downloadUrl: string;
-    }>;
-  };
-}
-
-interface AssessmentOverview {
-  courseSessionId: number;
-  courseCode: string;
-  courseName: string;
-  assessments: Assessment[];
-  totalAssessments: number;
-  completedAssessments: number;
-  pendingAssessments: number;
-  overallGrade: number;
-  overallLetterGrade: string;
-}
+import { assignmentService, Assignment, AssignmentSubmission, SubmitAssignmentRequest } from "../../../api/services/assignmentService";
+import toast from "react-hot-toast";
 
 const statusConfig = {
   pending: {
@@ -91,105 +48,144 @@ export default function ClassAssessments() {
   const { ClassId } = useParams();
   const { classDetails } = useOutletContext<{ classDetails: any }>();
   const { user } = useAuthStore();
-  const [assessmentOverview, setAssessmentOverview] = useState<AssessmentOverview | null>(null);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [submissions, setSubmissions] = useState<{ [key: number]: AssignmentSubmission }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submittingTo, setSubmittingTo] = useState<number | null>(null);
+  const [submissionData, setSubmissionData] = useState<SubmitAssignmentRequest>({
+    assignmentId: 0,
+    content: ""
+  });
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchAssessments = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        if (!ClassId || !user?.id) {
-          setError("Missing required information to load assessments.");
-          return;
-        }
-
-        // Fetch student's assessment overview for this course session
-        const response = await api.get(`/api/grades/grading/my-assessments/course-session/${ClassId}`);
-        
-        // Validate response data
-        if (!response.data) {
-          console.warn('No data received from assessments API');
-          setAssessmentOverview(null);
-          return;
-        }
-
-        // Ensure assessments array exists and is valid
-        const data = response.data;
-        const validatedData: AssessmentOverview = {
-          courseSessionId: data.courseSessionId || parseInt(ClassId),
-          courseCode: data.courseCode || classDetails?.code || '',
-          courseName: data.courseName || classDetails?.name || '',
-          assessments: Array.isArray(data.assessments) ? data.assessments.map((assessment: any) => ({
-            ...assessment,
-            attachments: Array.isArray(assessment.attachments) ? assessment.attachments : [],
-            mySubmission: assessment.mySubmission ? {
-              ...assessment.mySubmission,
-              attachments: Array.isArray(assessment.mySubmission.attachments) ? assessment.mySubmission.attachments : []
-            } : undefined
-          })) : [],
-          totalAssessments: data.totalAssessments || 0,
-          completedAssessments: data.completedAssessments || 0,
-          pendingAssessments: data.pendingAssessments || 0,
-          overallGrade: data.overallGrade || 0,
-          overallLetterGrade: data.overallLetterGrade || 'N/A'
-        };
-
-        setAssessmentOverview(validatedData);
-      } catch (err: any) {
-        console.error('Error fetching assessments:', err);
-        
-        if (err.response?.status === 404) {
-          setError("No assessments found for this course.");
-        } else if (err.response?.status === 403) {
-          setError("You don't have permission to view assessments for this course.");
-        } else {
-          setError("Failed to load assessments. Please try again later.");
-        }
-        
-        // Set null on error to prevent further issues
-        setAssessmentOverview(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAssessments();
-  }, [ClassId, user?.id, classDetails]);
-
-  const getAssessmentStatus = (assessment: Assessment) => {
-    if (assessment.isOverdue && !assessment.mySubmission) {
-      return 'overdue';
+    if (ClassId) {
+      fetchAssignments();
     }
-    if (assessment.mySubmission?.status === 'GRADED') {
+  }, [ClassId]);
+
+  const fetchAssignments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!ClassId || !user?.id) {
+        setError("Missing required information to load assignments.");
+        return;
+      }
+
+      // Fetch assignments for this course session
+      const assignmentsData = await assignmentService.getAssignmentsByCourseSession(parseInt(ClassId));
+      
+      // Filter only published assignments for students
+      const publishedAssignments = assignmentsData.filter(assignment => assignment.status === 'PUBLISHED');
+      setAssignments(publishedAssignments);
+
+      // Fetch submissions for each assignment
+      const submissionsMap: { [key: number]: AssignmentSubmission } = {};
+      for (const assignment of publishedAssignments) {
+        try {
+          const submission = await assignmentService.getMySubmissionForAssignment(assignment.id);
+          if (submission) {
+            submissionsMap[assignment.id] = submission;
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch submission for assignment ${assignment.id}`);
+        }
+      }
+      setSubmissions(submissionsMap);
+
+    } catch (err: any) {
+      console.error('Error fetching assignments:', err);
+      setError("Failed to load assignments. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAssignmentStatus = (assignment: Assignment) => {
+    const submission = submissions[assignment.id];
+    const now = new Date();
+    const dueDate = new Date(assignment.dueDate);
+    
+    if (submission?.status === 'GRADED') {
       return 'graded';
     }
-    if (assessment.mySubmission?.status === 'SUBMITTED') {
+    if (submission?.status === 'SUBMITTED') {
       return 'submitted';
+    }
+    if (now > dueDate) {
+      return 'overdue';
     }
     return 'pending';
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const validFiles = files.filter(file => file.size <= 10 * 1024 * 1024); // 10MB limit
+      
+      if (validFiles.length !== files.length) {
+        toast.error('Some files were too large (max 10MB per file)');
+      }
+      
+      setSelectedFiles(validFiles);
+    }
+  };
+
+  const handleSubmitAssignment = async (assignmentId: number) => {
+    if (!submissionData.content?.trim() && selectedFiles.length === 0) {
+      toast.error('Please provide either content or attach files');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      const submission = await assignmentService.submitAssignment(
+        { ...submissionData, assignmentId },
+        selectedFiles.length > 0 ? selectedFiles : undefined
+      );
+
+      setSubmissions(prev => ({ ...prev, [assignmentId]: submission }));
+      setSubmittingTo(null);
+      setSubmissionData({ assignmentId: 0, content: "" });
+      setSelectedFiles([]);
+      
+      toast.success('Assignment submitted successfully!');
+    } catch (err) {
+      console.error('Error submitting assignment:', err);
+      toast.error('Failed to submit assignment');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDownloadAttachment = async (downloadUrl: string, fileName: string) => {
     try {
-      const response = await fetch(downloadUrl);
-      if (!response.ok) {
-        throw new Error('Failed to download file');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await assignmentService.downloadAttachment(downloadUrl, fileName);
+      toast.success('Download started');
     } catch (err) {
       console.error('Error downloading attachment:', err);
+      toast.error('Failed to download file');
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(files => files.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -211,13 +207,13 @@ export default function ClassAssessments() {
     );
   }
 
-  if (!assessmentOverview || !assessmentOverview.assessments || assessmentOverview.assessments.length === 0) {
+  if (assignments.length === 0) {
     return (
       <div className="card text-center py-12">
         <ClipboardDocumentListIcon className="h-16 w-16 text-foreground-tertiary mx-auto mb-4" />
-        <h3 className="heading-4 mb-2">No Assessments Found</h3>
+        <h3 className="heading-4 mb-2">No Assignments Found</h3>
         <p className="body-default text-foreground-secondary">
-          No assessments have been published for this course yet.
+          No assignments have been published for this course yet.
         </p>
       </div>
     );
@@ -230,59 +226,28 @@ export default function ClassAssessments() {
         <div>
           <h2 className="heading-3 flex items-center">
             <ClipboardDocumentListIcon className="h-6 w-6 mr-2 text-primary-500" />
-            Class Assessments
+            Assignments
           </h2>
           <p className="body-default text-foreground-secondary mt-1">
-            Track your assignments, projects, and grades
+            View and submit your course assignments
           </p>
         </div>
         <div className="text-right">
-          <div className="body-small text-foreground-secondary">Overall Grade</div>
-          <div className="heading-4 text-primary-600">
-            {assessmentOverview.overallGrade.toFixed(1)}% ({assessmentOverview.overallLetterGrade})
-          </div>
+          <div className="body-small text-foreground-secondary">Total Assignments</div>
+          <div className="heading-4 text-primary-600">{assignments.length}</div>
         </div>
       </div>
 
-      {/* Grade Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card text-center">
-          <AcademicCapIcon className="h-8 w-8 text-primary-500 mx-auto mb-2" />
-          <div className="heading-4 text-primary-600">{assessmentOverview.overallGrade.toFixed(1)}%</div>
-          <div className="body-small text-foreground-secondary">Overall Grade</div>
-        </div>
-        
-        <div className="card text-center">
-          <div className="heading-4 text-foreground">{assessmentOverview.totalAssessments}</div>
-          <div className="body-small text-foreground-secondary">Total Assessments</div>
-        </div>
-        
-        <div className="card text-center">
-          <div className="heading-4 text-success-600">{assessmentOverview.completedAssessments}</div>
-          <div className="body-small text-foreground-secondary">Completed</div>
-        </div>
-        
-        <div className="card text-center">
-          <div className="heading-4 text-warning-600">{assessmentOverview.pendingAssessments}</div>
-          <div className="body-small text-foreground-secondary">Pending</div>
-        </div>
-      </div>
-
-      {/* Assessments List */}
-      <div className="space-y-4">
-        {assessmentOverview.assessments.map((assessment) => {
-          const status = getAssessmentStatus(assessment);
+      {/* Assignments List */}
+      <div className="space-y-6">
+        {assignments.map((assignment) => {
+          const status = getAssignmentStatus(assignment);
           const config = statusConfig[status];
           const IconComponent = config.icon;
-          
-          // Ensure attachments is always an array
-          const attachments = Array.isArray(assessment.attachments) ? assessment.attachments : [];
-          const submissionAttachments = assessment.mySubmission?.attachments && Array.isArray(assessment.mySubmission.attachments) 
-            ? assessment.mySubmission.attachments 
-            : [];
+          const submission = submissions[assignment.id];
           
           return (
-            <div key={assessment.id} className="card">
+            <div key={assignment.id} className="card">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start space-x-4 flex-1">
                   <div className={`p-3 rounded-lg ${config.bgColor}`}>
@@ -291,50 +256,44 @@ export default function ClassAssessments() {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="heading-4">{assessment.title}</h3>
+                      <h3 className="heading-4">{assignment.title}</h3>
                       <span className={`
                         px-3 py-1 rounded-full text-sm font-medium capitalize
                         ${config.bgColor} ${config.color}
                       `}>
-                        {status === 'pending' && assessment.isOverdue ? 'Overdue' : status}
+                        {status === 'pending' && assignment.isOverdue ? 'Overdue' : status}
                       </span>
                     </div>
                     
-                    <p className="body-default text-foreground-secondary mb-3">
-                      {assessment.description}
+                    <p className="body-default text-foreground-secondary mb-4">
+                      {assignment.description}
                     </p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                       <div className="flex items-center text-foreground-secondary">
                         <ClockIcon className="h-4 w-4 mr-2" />
                         <span className="body-small">
-                          Due: {new Date(assessment.dueDate).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          Due: {formatDate(assignment.dueDate)}
                         </span>
                       </div>
                       
                       <div className="flex items-center text-foreground-secondary">
                         <AcademicCapIcon className="h-4 w-4 mr-2" />
-                        <span className="body-small">Max Score: {assessment.maxScore}</span>
+                        <span className="body-small">Max Score: {assignment.maxScore}</span>
                       </div>
                       
                       <div className="flex items-center text-foreground-secondary">
                         <DocumentIcon className="h-4 w-4 mr-2" />
-                        <span className="body-small capitalize">{assessment.type.toLowerCase()}</span>
+                        <span className="body-small capitalize">{assignment.type.toLowerCase()}</span>
                       </div>
                     </div>
 
-                    {/* Attachments */}
-                    {attachments.length > 0 && (
+                    {/* Assignment Attachments */}
+                    {assignment.attachments.length > 0 && (
                       <div className="mb-4">
-                        <h4 className="body-small font-medium text-foreground mb-2">Attachments:</h4>
+                        <h4 className="body-small font-medium text-foreground mb-2">Assignment Files:</h4>
                         <div className="space-y-2">
-                          {attachments.map((attachment) => (
+                          {assignment.attachments.map((attachment) => (
                             <button
                               key={attachment.id}
                               onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
@@ -349,52 +308,53 @@ export default function ClassAssessments() {
                       </div>
                     )}
 
-                    {/* Submission Info */}
-                    {assessment.mySubmission && (
+                    {/* Submission Section */}
+                    {submission ? (
                       <div className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor}`}>
                         <h4 className="body-default font-medium mb-2">Your Submission</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                           <div>
                             <span className="body-small text-foreground-secondary">Submitted:</span>
                             <div className="body-small">
-                              {new Date(assessment.mySubmission.submittedAt).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                              {assessment.mySubmission.isLate && (
+                              {formatDate(submission.submittedAt)}
+                              {submission.isLate && (
                                 <span className="text-warning-600 ml-2">(Late)</span>
                               )}
                             </div>
                           </div>
                           
-                          {assessment.mySubmission.score !== undefined && (
+                          {submission.score !== undefined && (
                             <div>
                               <span className="body-small text-foreground-secondary">Grade:</span>
                               <div className="body-default font-medium">
-                                {assessment.mySubmission.score}/{assessment.maxScore}
+                                {submission.score}/{assignment.maxScore}
                                 <span className="text-foreground-secondary ml-2">
-                                  ({((assessment.mySubmission.score / assessment.maxScore) * 100).toFixed(1)}%)
+                                  ({((submission.score / assignment.maxScore) * 100).toFixed(1)}%)
                                 </span>
                               </div>
                             </div>
                           )}
                         </div>
                         
-                        {assessment.mySubmission.feedback && (
-                          <div>
-                            <span className="body-small text-foreground-secondary">Feedback:</span>
-                            <p className="body-small mt-1">{assessment.mySubmission.feedback}</p>
+                        {submission.content && (
+                          <div className="mb-3">
+                            <span className="body-small text-foreground-secondary">Content:</span>
+                            <p className="body-small mt-1">{submission.content}</p>
                           </div>
                         )}
                         
-                        {submissionAttachments.length > 0 && (
-                          <div className="mt-3">
+                        {submission.feedback && (
+                          <div className="mb-3">
+                            <span className="body-small text-foreground-secondary">Feedback:</span>
+                            <p className="body-small mt-1">{submission.feedback}</p>
+                          </div>
+                        )}
+                        
+                        {submission.attachments.length > 0 && (
+                          <div>
                             <span className="body-small text-foreground-secondary">Your Files:</span>
                             <div className="mt-1 space-y-1">
-                              {submissionAttachments.map((attachment) => (
+                              {submission.attachments.map((attachment) => (
                                 <button
                                   key={attachment.id}
                                   onClick={() => handleDownloadAttachment(attachment.downloadUrl, attachment.fileName)}
@@ -406,6 +366,117 @@ export default function ClassAssessments() {
                               ))}
                             </div>
                           </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Submission Form
+                      <div>
+                        {submittingTo === assignment.id ? (
+                          <div className="space-y-4 p-4 bg-background-secondary rounded-lg">
+                            <div className="flex justify-between items-center">
+                              <h4 className="body-default font-medium">Submit Assignment</h4>
+                              <button
+                                onClick={() => {
+                                  setSubmittingTo(null);
+                                  setSubmissionData({ assignmentId: 0, content: "" });
+                                  setSelectedFiles([]);
+                                }}
+                                className="text-foreground-secondary hover:text-foreground"
+                              >
+                                <XMarkIcon className="h-5 w-5" />
+                              </button>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-2">
+                                Content (Optional)
+                              </label>
+                              <textarea
+                                value={submissionData.content}
+                                onChange={(e) => setSubmissionData({ ...submissionData, content: e.target.value })}
+                                rows={4}
+                                className="input"
+                                placeholder="Enter any additional comments or explanations..."
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-foreground mb-2">
+                                Attach Files
+                              </label>
+                              <input
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                className="input"
+                                accept=".pdf,.doc,.docx,.txt,.zip,.rar,.jpg,.jpeg,.png,.gif"
+                              />
+                              <p className="body-small text-foreground-tertiary mt-1">
+                                Max 10MB per file. Supported formats: PDF, DOC, TXT, ZIP, Images
+                              </p>
+                            </div>
+                            
+                            {selectedFiles.length > 0 && (
+                              <div>
+                                <h5 className="body-small font-medium text-foreground mb-2">Selected Files:</h5>
+                                <div className="space-y-2">
+                                  {selectedFiles.map((file, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2 bg-background rounded">
+                                      <span className="body-small text-foreground">{file.name}</span>
+                                      <button
+                                        onClick={() => removeFile(index)}
+                                        className="text-error-600 hover:text-error-700"
+                                      >
+                                        <XMarkIcon className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex justify-end space-x-3">
+                              <button
+                                onClick={() => {
+                                  setSubmittingTo(null);
+                                  setSubmissionData({ assignmentId: 0, content: "" });
+                                  setSelectedFiles([]);
+                                }}
+                                className="btn btn-secondary"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleSubmitAssignment(assignment.id)}
+                                disabled={isSubmitting || (!submissionData.content?.trim() && selectedFiles.length === 0)}
+                                className="btn btn-primary"
+                              >
+                                {isSubmitting ? (
+                                  <div className="flex items-center">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Submitting...
+                                  </div>
+                                ) : (
+                                  <>
+                                    <PaperAirplaneIcon className="h-4 w-4 mr-2" />
+                                    Submit Assignment
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSubmittingTo(assignment.id);
+                              setSubmissionData({ assignmentId: assignment.id, content: "" });
+                            }}
+                            disabled={assignment.isOverdue}
+                            className={`btn ${assignment.isOverdue ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-primary'}`}
+                          >
+                            <PlusIcon className="h-4 w-4 mr-2" />
+                            {assignment.isOverdue ? 'Overdue' : 'Submit Assignment'}
+                          </button>
                         )}
                       </div>
                     )}
