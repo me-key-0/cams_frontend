@@ -40,6 +40,12 @@ interface SubmissionAnswer {
   answerId: number;
 }
 
+interface EvaluationSubmissionStatus {
+  hasSubmitted: boolean;
+  submittedAt?: string;
+  sessionId?: number;
+}
+
 const ratingOptions = [
   { id: 5, label: "Excellent", value: 5, color: "text-green-600" },
   { id: 4, label: "Very Good", value: 4, color: "text-blue-600" },
@@ -51,7 +57,7 @@ const ratingOptions = [
 const ClassEvaluation: React.FC = () => {
   const { ClassId } = useParams<{ ClassId: string }>();
   const { classDetails } = useOutletContext<{ classDetails: any }>();
-  const { user } = useAuthStore();
+  const { user, student } = useAuthStore();
   
   const [evaluationSession, setEvaluationSession] = useState<EvaluationSession | null>(null);
   const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
@@ -59,7 +65,7 @@ const ClassEvaluation: React.FC = () => {
   const [answers, setAnswers] = useState<{ [key: number]: number }>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<EvaluationSubmissionStatus>({ hasSubmitted: false });
   const [error, setError] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<'inactive' | 'active' | 'not_found'>('inactive');
 
@@ -69,12 +75,22 @@ const ClassEvaluation: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        if (!ClassId) {
-          setError("Course session ID is required.");
+        if (!ClassId || !user?.id || !student?.id) {
+          setError("Required information is missing.");
           return;
         }
 
-        // First, try to check if there's an active evaluation session
+        // First, check if student has already submitted evaluation for this course session
+        await checkSubmissionStatus();
+
+        // If already submitted, don't fetch other data
+        const submissionCheck = await checkIfAlreadySubmitted();
+        if (submissionCheck.hasSubmitted) {
+          setSubmissionStatus(submissionCheck);
+          return;
+        }
+
+        // Check if there's an active evaluation session
         try {
           const sessionResponse = await api.get(`/api/users/v1/evaluation/session/${ClassId}/status`);
           
@@ -100,12 +116,11 @@ const ClassEvaluation: React.FC = () => {
             setSessionStatus('not_found');
             return;
           } else {
-            // For other errors, still try to load questions in case it's a temporary issue
             setSessionStatus('inactive');
           }
         }
 
-        // If we have an active session, fetch questions and categories
+        // If we have an active session and no submission, fetch questions and categories
         if (sessionStatus === 'active' || sessionStatus === 'inactive') {
           try {
             // Fetch evaluation questions
@@ -121,7 +136,6 @@ const ClassEvaluation: React.FC = () => {
             }
           } catch (dataErr: any) {
             console.error('Error fetching evaluation data:', dataErr);
-            // Don't set error here as we want to show the session status message
           }
         }
 
@@ -134,7 +148,53 @@ const ClassEvaluation: React.FC = () => {
     };
 
     fetchEvaluationData();
-  }, [ClassId, classDetails]);
+  }, [ClassId, classDetails, user?.id, student?.id]);
+
+  const checkIfAlreadySubmitted = async (): Promise<EvaluationSubmissionStatus> => {
+    try {
+      if (!ClassId || !student?.id) {
+        return { hasSubmitted: false };
+      }
+
+      // Check if there's a submission record for this student and course session
+      const response = await api.get(`/api/users/v1/evaluation/submission-status/${ClassId}/${student.id}`);
+      
+      if (response.data?.hasSubmitted) {
+        return {
+          hasSubmitted: true,
+          submittedAt: response.data.submittedAt,
+          sessionId: response.data.sessionId
+        };
+      }
+      
+      return { hasSubmitted: false };
+    } catch (err: any) {
+      // If endpoint doesn't exist or returns 404, assume no submission
+      if (err.response?.status === 404) {
+        return { hasSubmitted: false };
+      }
+      
+      // For other errors, check localStorage as fallback
+      const localStorageKey = `evaluation_submitted_${ClassId}_${student?.id}`;
+      const localSubmission = localStorage.getItem(localStorageKey);
+      
+      if (localSubmission) {
+        const submissionData = JSON.parse(localSubmission);
+        return {
+          hasSubmitted: true,
+          submittedAt: submissionData.submittedAt,
+          sessionId: submissionData.sessionId
+        };
+      }
+      
+      return { hasSubmitted: false };
+    }
+  };
+
+  const checkSubmissionStatus = async () => {
+    const status = await checkIfAlreadySubmitted();
+    setSubmissionStatus(status);
+  };
 
   const handleAnswerChange = (questionId: number, answerId: number) => {
     setAnswers(prev => ({
@@ -166,7 +226,19 @@ const ClassEvaluation: React.FC = () => {
         answers: submissionAnswers
       });
 
-      setSubmitted(true);
+      // Mark as submitted in state and localStorage
+      const submissionData = {
+        hasSubmitted: true,
+        submittedAt: new Date().toISOString(),
+        sessionId: parseInt(ClassId!)
+      };
+      
+      setSubmissionStatus(submissionData);
+      
+      // Store in localStorage as backup
+      const localStorageKey = `evaluation_submitted_${ClassId}_${student?.id}`;
+      localStorage.setItem(localStorageKey, JSON.stringify(submissionData));
+
     } catch (err: any) {
       console.error('Error submitting evaluation:', err);
       setError(err.response?.data?.message || "Failed to submit evaluation. Please try again.");
@@ -185,10 +257,71 @@ const ClassEvaluation: React.FC = () => {
     return Math.round((answeredQuestions / questions.length) * 100);
   };
 
+  const formatSubmissionDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  // Show confirmation page if already submitted
+  if (submissionStatus.hasSubmitted) {
+    return (
+      <div className="text-center py-12">
+        <CheckCircleIcon className="h-20 w-20 text-success-500 mx-auto mb-6" />
+        <h3 className="heading-2 mb-4">Evaluation Already Submitted!</h3>
+        <p className="body-default text-foreground-secondary mb-6">
+          You have successfully submitted your evaluation for this course.
+        </p>
+        
+        <div className="max-w-md mx-auto">
+          <div className="status-success p-6 rounded-lg">
+            <div className="text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="body-small font-medium">Course:</span>
+                <span className="body-small">{classDetails?.code} - {classDetails?.name}</span>
+              </div>
+              
+              {submissionStatus.submittedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="body-small font-medium">Submitted:</span>
+                  <span className="body-small">{formatSubmissionDate(submissionStatus.submittedAt)}</span>
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <span className="body-small font-medium">Status:</span>
+                <span className="body-small font-medium text-success-700">Completed</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 p-4 bg-background-secondary rounded-lg">
+            <div className="flex items-start">
+              <InformationCircleIcon className="h-5 w-5 text-primary-600 mt-0.5 mr-3 flex-shrink-0" />
+              <div className="text-left">
+                <p className="body-small font-medium mb-2">Thank you for your feedback!</p>
+                <ul className="body-small space-y-1 text-foreground-secondary">
+                  <li>• Your responses help improve the quality of education</li>
+                  <li>• Evaluations are anonymous and confidential</li>
+                  <li>• Results are used for course and instructor improvement</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -234,23 +367,6 @@ const ClassEvaluation: React.FC = () => {
         >
           Try Again
         </button>
-      </div>
-    );
-  }
-
-  if (submitted) {
-    return (
-      <div className="text-center py-12">
-        <CheckCircleIcon className="h-16 w-16 text-success-500 mx-auto mb-4" />
-        <h3 className="heading-3 mb-2">Evaluation Submitted Successfully!</h3>
-        <p className="body-default text-foreground-secondary mb-6">
-          Thank you for your feedback. Your responses help improve the quality of education.
-        </p>
-        <div className="status-success p-4 rounded-lg max-w-md mx-auto">
-          <p className="body-small">
-            Your evaluation has been recorded and will be used to enhance the learning experience for future students.
-          </p>
-        </div>
       </div>
     );
   }
